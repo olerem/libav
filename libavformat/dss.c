@@ -1,6 +1,6 @@
 /*
- * mtv demuxer
- * Copyright (c) 2006 Reynaldo H. Verdejo Pinochet
+ * dss demuxer
+ * Copyright (c) 2014 Oleksij Rempel
  *
  * This file is part of Libav.
  *
@@ -31,19 +31,18 @@
 #include "avformat.h"
 #include "internal.h"
 
-#define DSS_HEADER_SIZE 1024
-#define DSS_BLOCK_SIZE 512
-#define DSS_AUDIO_PADDING_SIZE 6
-#define DSS_ASUBCHUNK_DATA_SIZE 506
+#define DSS_HEAD_OFFSET_ACODEC        0x2c1
+#define DSS_ACODEC_G723_1             0x2
+
+#define DSS_BLOCK_SIZE                512
+#define DSS_HEADER_SIZE               (DSS_BLOCK_SIZE * 2)
+#define DSS_AUDIO_BLOCK_HEADER_SIZE   6
 
 static const uint8_t frame_size[4] = { 24, 20, 4, 1 };
 
 typedef struct DSSDemuxContext {
 
-    unsigned int file_size;         ///< filesize, not always right
-    unsigned int segments;          ///< number of 512 byte segments
-    unsigned int audio_identifier;  ///< 'MP3' on all files I have seen
-    unsigned int audio_br;          ///< bitrate of audio channel (mp3)
+    unsigned int audio_codec;
     int counter;
 
 } DSSDemuxContext;
@@ -77,7 +76,7 @@ static int dss_read_header(AVFormatContext *s)
     avpriv_set_pts_info(st, 64, 1, st->codec->sample_rate);
     st->start_time = 0;
 
-    // Jump over header
+    /* Jump over header */
 
     if(avio_seek(pb, DSS_HEADER_SIZE, SEEK_SET) != DSS_HEADER_SIZE)
         return AVERROR(EIO);
@@ -88,18 +87,27 @@ static int dss_read_header(AVFormatContext *s)
 
 }
 
-static int dss_read_packet(AVFormatContext *s, AVPacket *pkt)
+static void dss_skip_audio_header(AVFormatContext *s, AVPacket *pkt)
 {
     DSSDemuxContext *priv = s->priv_data;
     AVIOContext *pb = s->pb;
+
+    avio_skip(pb, DSS_AUDIO_BLOCK_HEADER_SIZE);
+    priv->counter += DSS_BLOCK_SIZE - DSS_AUDIO_BLOCK_HEADER_SIZE;
+}
+
+static int dss_read_packet(AVFormatContext *s, AVPacket *pkt)
+{
+    DSSDemuxContext *priv = s->priv_data;
     int size, byte, ret, offset;
 
-    if (priv->counter == 0) {
-        avio_skip(pb, DSS_AUDIO_PADDING_SIZE);
-        priv->counter = DSS_BLOCK_SIZE - DSS_AUDIO_PADDING_SIZE;
-    }
+    if (priv->counter == 0)
+        dss_skip_audio_header(s, pkt);
 
     pkt->pos = avio_tell(s->pb);
+    /* We make here one byte step.
+     * Don't forget to add offset.
+     */
     byte     = avio_r8(s->pb);
     size     = frame_size[byte & 3];
     priv->counter -= size;
@@ -115,16 +123,16 @@ static int dss_read_packet(AVFormatContext *s, AVPacket *pkt)
 
     if (priv->counter < 0) {
         int size2 = priv->counter + size;
+
         ret = avio_read(s->pb, pkt->data + offset,
             size2 - offset);
         if (ret < size2 - offset) {
             av_free_packet(pkt);
             return ret < 0 ? ret : AVERROR_EOF;
         }
-        priv->counter += DSS_BLOCK_SIZE - DSS_AUDIO_PADDING_SIZE;
-        avio_skip(pb, DSS_AUDIO_PADDING_SIZE);
-        offset = size2;
 
+        dss_skip_audio_header(s, pkt);
+        offset = size2;
     }
 
     ret = avio_read(s->pb, pkt->data + offset, size - offset);
