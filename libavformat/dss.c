@@ -31,8 +31,9 @@
 #include "avformat.h"
 #include "internal.h"
 
-#define DSS_HEAD_OFFSET_ACODEC        0x2c1
-#define DSS_ACODEC_G723_1             0x2
+#define DSS_HEAD_OFFSET_ACODEC        0x2a4
+#define DSS_ACODEC_0                  0x0    /* SP mode */
+#define DSS_ACODEC_G723_1             0x2    /* LP mode */
 
 #define DSS_BLOCK_SIZE                512
 #define DSS_HEADER_SIZE               (DSS_BLOCK_SIZE * 2)
@@ -67,8 +68,20 @@ static int dss_read_header(AVFormatContext *s)
     if (!st)
         return AVERROR(ENOMEM);
 
+    avio_seek(pb, DSS_HEAD_OFFSET_ACODEC, SEEK_SET);
+    priv->audio_codec = avio_r8(pb);
+
+    if (priv->audio_codec == DSS_ACODEC_0) {
+        printf("Not supported codec. DSS_ACODEC_0.\n");
+        return AVERROR(EINVAL);
+    } else if (priv->audio_codec == DSS_ACODEC_G723_1) {
+        st->codec->codec_id       = AV_CODEC_ID_G723_1;
+    } else {
+        printf("Not supported codec: %x.\n", priv->audio_codec);
+        return AVERROR(EINVAL);
+    }
+
     st->codec->codec_type     = AVMEDIA_TYPE_AUDIO;
-    st->codec->codec_id       = AV_CODEC_ID_G723_1;
     st->codec->channel_layout = AV_CH_LAYOUT_MONO;
     st->codec->channels       = 1;
     st->codec->sample_rate    = 8000;
