@@ -31,6 +31,8 @@
 #include "avformat.h"
 #include "internal.h"
 
+#define DSS_HEAD_OFFSET_AUTHOR        0xc
+#define DSS_AUTHOR_SIZE               0xf
 #define DSS_HEAD_OFFSET_ACODEC        0x2a4
 #define DSS_ACODEC_0                  0x0    /* SP mode */
 #define DSS_ACODEC_G723_1             0x2    /* LP mode */
@@ -58,6 +60,31 @@ static int dss_probe(AVProbeData *p)
     return AVPROBE_SCORE_MAX;
 }
 
+static int dss_read_methadata_string(AVFormatContext *s, unsigned int offset,
+           unsigned int size, const char *key)
+{
+    AVIOContext     *pb  = s->pb;
+    char            *value;
+    int             ret;
+
+    avio_seek(pb, offset, SEEK_SET);
+
+    value = av_malloc(size + 1);
+    if (!value)
+        return AVERROR(ENOMEM);
+    /*make sure, string will end with \0 */
+    *(value + size + 1) = '\0';
+
+    ret = avio_read(s->pb, value, size);
+    av_dict_set(&s->metadata, key, value, 0);
+
+    av_free(value);
+    if (ret < size)
+        return ret < 0 ? ret : AVERROR_EOF;
+
+    return ret;
+}
+
 static int dss_read_header(AVFormatContext *s)
 {
     DSSDemuxContext *priv = s->priv_data;
@@ -67,6 +94,9 @@ static int dss_read_header(AVFormatContext *s)
     st = avformat_new_stream(s, NULL);
     if (!st)
         return AVERROR(ENOMEM);
+
+    dss_read_methadata_string(s, DSS_HEAD_OFFSET_AUTHOR,
+            DSS_AUTHOR_SIZE, "author");
 
     avio_seek(pb, DSS_HEAD_OFFSET_ACODEC, SEEK_SET);
     priv->audio_codec = avio_r8(pb);
