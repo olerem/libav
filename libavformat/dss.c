@@ -32,10 +32,14 @@
 #include "internal.h"
 
 #define DSS_HEAD_OFFSET_AUTHOR        0xc
-#define DSS_AUTHOR_SIZE               0xf
+#define DSS_AUTHOR_SIZE               16
+
 #define DSS_HEAD_OFFSET_ACODEC        0x2a4
 #define DSS_ACODEC_0                  0x0    /* SP mode */
 #define DSS_ACODEC_G723_1             0x2    /* LP mode */
+
+#define DSS_HEAD_OFFSET_COMMENT       0x31e
+#define DSS_COMMENT_SIZE              64
 
 #define DSS_BLOCK_SIZE                512
 #define DSS_HEADER_SIZE               (DSS_BLOCK_SIZE * 2)
@@ -69,11 +73,11 @@ static int dss_read_methadata_string(AVFormatContext *s, unsigned int offset,
 
     avio_seek(pb, offset, SEEK_SET);
 
-    value = av_malloc(size + 1);
+    value = av_malloc(size);
     if (!value)
         return AVERROR(ENOMEM);
     /*make sure, string will end with \0 */
-    *(value + size + 1) = '\0';
+    *(value + size) = '\0';
 
     ret = avio_read(s->pb, value, size);
     av_dict_set(&s->metadata, key, value, 0);
@@ -97,6 +101,9 @@ static int dss_read_header(AVFormatContext *s)
 
     dss_read_methadata_string(s, DSS_HEAD_OFFSET_AUTHOR,
             DSS_AUTHOR_SIZE, "author");
+
+    dss_read_methadata_string(s, DSS_HEAD_OFFSET_COMMENT,
+            DSS_COMMENT_SIZE, "comment");
 
     avio_seek(pb, DSS_HEAD_OFFSET_ACODEC, SEEK_SET);
     priv->audio_codec = avio_r8(pb);
