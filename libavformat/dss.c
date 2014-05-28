@@ -34,6 +34,10 @@
 #define DSS_HEAD_OFFSET_AUTHOR        0xc
 #define DSS_AUTHOR_SIZE               16
 
+#define DSS_HEAD_OFFSET_START_TIME    0x26
+#define DSS_HEAD_OFFSET_END_TIME      0x32
+#define DSS_TIME_SIZE                 12
+
 #define DSS_HEAD_OFFSET_ACODEC        0x2a4
 #define DSS_ACODEC_0                  0x0    /* SP mode */
 #define DSS_ACODEC_G723_1             0x2    /* LP mode */
@@ -62,6 +66,32 @@ static int dss_probe(AVProbeData *p)
         return 0;
 
     return AVPROBE_SCORE_MAX;
+}
+
+
+static int dss_read_methadata_date(AVFormatContext *s, unsigned int offset,
+           const char *key)
+{
+    AVIOContext     *pb  = s->pb;
+    char            string[DSS_TIME_SIZE], datetime[64];
+    int             y, month, d, h, minute, sec;
+    int             ret;
+
+    avio_seek(pb, offset, SEEK_SET);
+
+    ret = avio_read(s->pb, string, DSS_TIME_SIZE);
+    if (ret < DSS_TIME_SIZE)
+        return ret < 0 ? ret : AVERROR_EOF;
+
+    sscanf(string, "%2d%2d%2d%2d%2d%2d", &y, &month, &d, &h, &minute, &sec);
+    /* We deal here with two digit year, so set default date to 2000
+     * and hope it will never be used in next century
+     */
+    snprintf(datetime, sizeof(datetime), "%.4d-%.2d-%.2dT%.2d:%.2d:%.2d",
+            y + 2000, month, d, h, minute, sec);
+    av_dict_set(&s->metadata, key, datetime, 0);
+
+    return ret;
 }
 
 static int dss_read_methadata_string(AVFormatContext *s, unsigned int offset,
@@ -101,6 +131,7 @@ static int dss_read_header(AVFormatContext *s)
 
     dss_read_methadata_string(s, DSS_HEAD_OFFSET_AUTHOR,
             DSS_AUTHOR_SIZE, "author");
+    dss_read_methadata_date(s, DSS_HEAD_OFFSET_END_TIME, "date");
 
     dss_read_methadata_string(s, DSS_HEAD_OFFSET_COMMENT,
             DSS_COMMENT_SIZE, "comment");
