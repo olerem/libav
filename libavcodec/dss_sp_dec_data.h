@@ -37,7 +37,7 @@ struct struc_6 {
 };
 
 struct struc_8 {
-	int32_t field_0;
+	//int32_t field_0;
 	int32_t array14_stage2[15]; // generally it is array14,
 	// first field is used for some thing else and should be moved to filed_0
 	int32_t field_38;
