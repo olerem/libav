@@ -11,6 +11,8 @@
 #define SUBFRAMES		4
 #define PULSE_MAX		8
 #define DSS_CBUF_SIZE	21
+#define DSS_SP_FRAME_SIZE 42
+#define DSS_SP_SAMPLE_COUNT (66 * SUBFRAMES)
 
 struct dss2_subframe {
 	int16_t gain;
@@ -25,8 +27,7 @@ struct struc_1 {
 	int16_t	array14_stage0[14];
 
 	int16_t subframe_something[SUBFRAMES];
-	int16_t filed_1e;
-	int16_t array_20[3];
+	int16_t array_20[SUBFRAMES];
 
 	struct dss2_subframe sf[SUBFRAMES];
 };
@@ -37,8 +38,8 @@ struct struc_6 {
 };
 
 struct struc_8 {
-	//int32_t field_0;
-	int32_t array14_stage2[15]; // generally it is array14,
+	int32_t field_0;
+	int32_t array14_stage2[14]; // generally it is array14,
 	// first field is used for some thing else and should be moved to filed_0
 	int32_t field_38;
 };
@@ -238,12 +239,12 @@ static const int16_t  dss2_pulse_val[8] = {
     -31182, -22273, -13364, -4455, 4455, 13364, 22273, 31182
 };
 
-static const int32_t g_unc_ro_array37_3C845C[] = {
+static const int32_t binary_decreasing_array[] = {
 		32767, 16384, 8192, 4096, 2048, 1024, 512, 256,
 		128, 64, 32, 16, 8, 4, 2,
 };
 
-static const int32_t g_unc_ro_array15_3C8420[] = {
+static const int32_t dss_sp_unc_decreasing_array[] = {
 		32767, 26214, 20972, 16777, 13422, 10737, 8590, 6872,
 		5498, 4398, 3518, 2815, 2252, 1801, 1441,
 };

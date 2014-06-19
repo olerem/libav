@@ -5,220 +5,160 @@
  *      Autor: lex
  */
 
+#define BITSTREAM_READER_LE
+#include "libavutil/channel_layout.h"
+#include "libavutil/mem.h"
+#include "libavutil/opt.h"
+#include "avcodec.h"
+#include "get_bits.h"
+#include "acelp_vectors.h"
+#include "celp_filters.h"
+#include "internal.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include "dss.h"
-
-unsigned int word_3D1266;
-
-unsigned int word_3D0C26;
-int dword_3D0498;
-unsigned int flip;
-int32_t g_unc_rw_array15_3D0420[15];
-int32_t g_unc_rw_array15_3D045C[15];
-struct struc_6 g_unc_rw_array14_stg1_3D0D64;
-struct struc_8 g_unc_rw_array15_stg2_3D08C0;
-int16_t array14_3D0DA4[14];
-int32_t g_unc_rw_array72_3D0C44[72];
-int32_t g_unc_rw_arrayXX_3D08FC[186];
-int16_t word_3D9B7E;
-int dword_3D0DA0;
-struct struc_8 g_unc_rw_array15_3D0BE8;
-int32_t g_unc_rw_array288_3D0DC0[288 + 6];
-int32_t g_unc_rw_array_3D04A0[264];
+#include "dss_sp_dec_data.h"
 
 typedef struct dss_sp_context {
     AVClass *class;
+    int32_t g_unc_rw_array288_3D0DC0[288 + 6];
+    int32_t g_unc_rw_arrayXX_3D08FC[187];
+	struct struc_1 struc_1_v96;
+	int32_t local_rw_array72_v101[SUBFRAMES][72];
+	int32_t g_unc_rw_array15_3D0420[15];
+	int32_t g_unc_rw_array15_3D045C[15];
+	struct struc_6 g_unc_rw_array14_stg1_3D0D64;
+	int32_t g_unc_rw_array15_stg2_3D08C0[15];
+	int16_t array14_3D0DA4[14];
+	int32_t g_unc_rw_array72_3D0C44[72];
+	int dword_3D0498;
+	int dword_3D0DA0;
+	int32_t g_unc_rw_array15_3D0BE8[15];
 
-    G723_1_Subframe subframe[4];
-    enum FrameType cur_frame_type;
-    enum FrameType past_frame_type;
-    enum Rate cur_rate;
-    uint8_t lsp_index[LSP_BANDS];
-    int pitch_lag[2];
-    int erased_frames;
+    unsigned int word_3D0C26;
 
-    int16_t prev_lsp[LPC_ORDER];
-    int16_t sid_lsp[LPC_ORDER];
-    int16_t prev_excitation[PITCH_MAX];
-    int16_t excitation[PITCH_MAX + FRAME_LEN + 4];
-    int16_t synth_mem[LPC_ORDER];
-    int16_t fir_mem[LPC_ORDER];
-    int     iir_mem[LPC_ORDER];
-
-    int random_seed;
-    int cng_random_seed;
-    int interp_index;
-    int interp_gain;
-    int sid_gain;
-    int cur_gain;
-    int reflection_coef;
-    int pf_gain;
-    int postfilter;
-
-    int16_t audio[FRAME_LEN + LPC_ORDER + PITCH_MAX + 4];
 } DSS_SP_Context;
 
 static av_cold int dss_sp_decode_init(AVCodecContext *avctx)
 {
     DSS_SP_Context *p = avctx->priv_data;
-
     avctx->channel_layout = AV_CH_LAYOUT_MONO;
     avctx->sample_fmt     = AV_SAMPLE_FMT_S16;
     avctx->channels       = 1;
     avctx->sample_rate    = 12000;
-    p->pf_gain            = 1 << 12;
 
-#if 0
-    memcpy(p->prev_lsp, dc_lsp, LPC_ORDER * sizeof(*p->prev_lsp));
-    memcpy(p->sid_lsp,  dc_lsp, LPC_ORDER * sizeof(*p->sid_lsp));
-
-    p->cng_random_seed = CNG_RANDOM_SEED;
-    p->past_frame_type = SID_FRAME;
-#endif
+    memset(p->g_unc_rw_arrayXX_3D08FC, 0, 0x2ECu);
+    p->word_3D0C26 = 1;
 
     return 0;
 }
 
-static void dss2_byte_swap(int8_t *abuff_swap, int8_t *abuff_src) {
-	uint8_t *abuff_tmp;
-	int size; // si@1
+static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff, const int16_t *compressed_buf) {
+
 	int i;
+	int subframe_idx;
+	uint32_t v43;
+	int v46;
+	uint32_t v51;
+	uint32_t v48;
 
-	abuff_tmp = abuff_src;
-	size = DSS_CBUF_SIZE;
-	if (flip) {
-		unsigned int tmp = abuff_tmp[0];
-		abuff_tmp++;
+	reconstr_abuff->array14_stage0[0] = (compressed_buf[0] >> 11) & 0x1F;
+	reconstr_abuff->array14_stage0[1] = (compressed_buf[0] >> 6) & 0x1F;
+	reconstr_abuff->array14_stage0[2] = (compressed_buf[0] >> 2) & 0xF;
+	reconstr_abuff->array14_stage0[3] = ((compressed_buf[1] >> 14) & 3)
+			+ 4 * (compressed_buf[0] & 3);
 
-		for (i = 0; i < size - 1; i++) {
-			abuff_swap[0] = tmp;
-			abuff_swap[1] = abuff_tmp[0];
-			tmp = abuff_tmp[1];
-			abuff_tmp += 2;
-			abuff_swap += 2;
-		}
+	reconstr_abuff->array14_stage0[4] = (compressed_buf[1] >> 10) & 0xF;
+	reconstr_abuff->array14_stage0[5] = (compressed_buf[1] >> 6) & 0xF;
+	reconstr_abuff->array14_stage0[6] = (compressed_buf[1] >> 2) & 0xF;
+	reconstr_abuff->array14_stage0[7] = ((compressed_buf[2] >> 14) & 3)
+			+ 4 * (compressed_buf[1] & 3);
 
-		word_3D1266 = tmp;
-		abuff_swap[0] = 0;
-		abuff_swap[1] = abuff_tmp[0];
-		flip ^= 1;
-	} else {
-		abuff_swap[0] = abuff_tmp[2];
-		abuff_swap[1] = word_3D1266;
-		abuff_tmp++;
-		abuff_swap += 2;
+	reconstr_abuff->array14_stage0[8] = (compressed_buf[2] >> 11) & 7;
+	reconstr_abuff->array14_stage0[9] = (compressed_buf[2] >> 8) & 7;
+	reconstr_abuff->array14_stage0[10] = (compressed_buf[2] >> 5) & 7;
+	reconstr_abuff->array14_stage0[11] = (compressed_buf[2] >> 2) & 7;
+	reconstr_abuff->array14_stage0[12] = ((compressed_buf[3] >> 15) & 1)
+			+ 2 * (compressed_buf[2] & 3);
 
-		for (i = 0; i < size - 2; i++) {
-			abuff_swap[0] = abuff_tmp[3];
-			abuff_swap[1] = abuff_tmp[0];
-			abuff_swap += 2;
-			abuff_tmp += 2;
-		}
+	reconstr_abuff->array14_stage0[13] = (compressed_buf[3] >> 12) & 7;
 
-		abuff_swap[1] = abuff_tmp[0];
-		flip ^= 1;
-	}
-}
+	reconstr_abuff->subframe_something[0] = (compressed_buf[3] >> 7) & 0x1F;
 
-static void dss2_unpack_coeffs(struct struc_1 *reconstr_abuff, int16_t *abuff_swap_a2) {
-
-	int v12; // edx@2
-	int i;
-
-	reconstr_abuff->array14_stage0[0] = (abuff_swap_a2[0] >> 11) & 0x1F;
-	reconstr_abuff->array14_stage0[1] = (abuff_swap_a2[0] >> 6) & 0x1F;
-	reconstr_abuff->array14_stage0[2] = (abuff_swap_a2[0] >> 2) & 0xF;
-	reconstr_abuff->array14_stage0[3] = ((abuff_swap_a2[1] >> 14) & 3)
-			+ 4 * (abuff_swap_a2[0] & 3);
-
-	reconstr_abuff->array14_stage0[4] = (abuff_swap_a2[1] >> 10) & 0xF;
-	reconstr_abuff->array14_stage0[5] = (abuff_swap_a2[1] >> 6) & 0xF;
-	reconstr_abuff->array14_stage0[6] = (abuff_swap_a2[1] >> 2) & 0xF;
-	reconstr_abuff->array14_stage0[7] = ((abuff_swap_a2[2] >> 14) & 3)
-			+ 4 * (abuff_swap_a2[1] & 3);
-
-	reconstr_abuff->array14_stage0[8] = (abuff_swap_a2[2] >> 11) & 7;
-	reconstr_abuff->array14_stage0[9] = (abuff_swap_a2[2] >> 8) & 7;
-	reconstr_abuff->array14_stage0[10] = (abuff_swap_a2[2] >> 5) & 7;
-	reconstr_abuff->array14_stage0[11] = (abuff_swap_a2[2] >> 2) & 7;
-	reconstr_abuff->array14_stage0[12] = ((abuff_swap_a2[3] >> 15) & 1)
-			+ 2 * (abuff_swap_a2[2] & 3);
-
-	reconstr_abuff->array14_stage0[13] = (abuff_swap_a2[3] >> 12) & 7;
-
-	reconstr_abuff->subframe_something[0] = (abuff_swap_a2[3] >> 7) & 0x1F;
-
-	// instead of "*((uint8_t *)abuff_swap_ptr + 11)" can be "(abuff_swap_ptr[5] >> 8) & 0xf"
 	reconstr_abuff->sf[0].combined_pulse_pos =
-			*((uint8_t *) abuff_swap_a2 + 11)
-					+ ((abuff_swap_a2[4] + ((abuff_swap_a2[3] & 0x7F) << 16))
-							<< 8);
-	reconstr_abuff->sf[0].gain = (abuff_swap_a2[5] >> 2) & 0x3F;
+			  (compressed_buf[5] & 0xff00) >> 8
+			| (compressed_buf[4] & 0xffff) << 8
+			| (compressed_buf[3] & 0x7f) << 24;
 
-	reconstr_abuff->sf[0].pulse_val[0] = ((abuff_swap_a2[6] >> 15) & 1)
-			+ 2 * (abuff_swap_a2[5] & 3);
-	reconstr_abuff->sf[0].pulse_val[1] = (abuff_swap_a2[6] >> 12) & 7;
-	reconstr_abuff->sf[0].pulse_val[2] = (abuff_swap_a2[6] >> 9) & 7;
-	reconstr_abuff->sf[0].pulse_val[3] = (abuff_swap_a2[6] >> 6) & 7;
-	reconstr_abuff->sf[0].pulse_val[4] = (abuff_swap_a2[6] >> 3) & 7;
-	reconstr_abuff->sf[0].pulse_val[5] = abuff_swap_a2[6] & 7;
-	reconstr_abuff->sf[0].pulse_val[6] = (abuff_swap_a2[7] >> 13) & 7;
+	reconstr_abuff->sf[0].gain = (compressed_buf[5] >> 2) & 0x3F;
 
-	reconstr_abuff->subframe_something[1] = (abuff_swap_a2[7] >> 8) & 0x1F;
+	reconstr_abuff->sf[0].pulse_val[0] = ((compressed_buf[6] >> 15) & 1)
+			+ 2 * (compressed_buf[5] & 3);
+	reconstr_abuff->sf[0].pulse_val[1] = (compressed_buf[6] >> 12) & 7;
+	reconstr_abuff->sf[0].pulse_val[2] = (compressed_buf[6] >> 9) & 7;
+	reconstr_abuff->sf[0].pulse_val[3] = (compressed_buf[6] >> 6) & 7;
+	reconstr_abuff->sf[0].pulse_val[4] = (compressed_buf[6] >> 3) & 7;
+	reconstr_abuff->sf[0].pulse_val[5] = compressed_buf[6] & 7;
+	reconstr_abuff->sf[0].pulse_val[6] = (compressed_buf[7] >> 13) & 7;
 
-	reconstr_abuff->sf[1].combined_pulse_pos = ((abuff_swap_a2[9] >> 9) & 0x7F)
-			+ ((abuff_swap_a2[8] + (abuff_swap_a2[7] << 16)) << 7);
-	reconstr_abuff->sf[1].gain = (abuff_swap_a2[9] >> 3) & 0x3F;
+	reconstr_abuff->subframe_something[1] = (compressed_buf[7] >> 8) & 0x1F;
 
-	reconstr_abuff->sf[1].pulse_val[0] = abuff_swap_a2[9] & 7;
-	reconstr_abuff->sf[1].pulse_val[1] = (abuff_swap_a2[10] >> 13) & 7;
-	reconstr_abuff->sf[1].pulse_val[2] = (abuff_swap_a2[10] >> 10) & 7;
-	reconstr_abuff->sf[1].pulse_val[3] = (abuff_swap_a2[10] >> 7) & 7;
-	reconstr_abuff->sf[1].pulse_val[4] = (abuff_swap_a2[10] >> 4) & 7;
-	reconstr_abuff->sf[1].pulse_val[5] = (abuff_swap_a2[10] >> 1) & 7;
-	reconstr_abuff->sf[1].pulse_val[6] = ((abuff_swap_a2[11] >> 14) & 3)
-			+ 4 * (abuff_swap_a2[10] & 1);
+	reconstr_abuff->sf[1].combined_pulse_pos =
+			  (compressed_buf[9] & 0xfe00) >> 9
+			| (compressed_buf[8] & 0xffff) << 7
+			| (compressed_buf[7] & 0xff) << 23;
 
-	reconstr_abuff->subframe_something[2] = (abuff_swap_a2[11] >> 9) & 0x1F;
+	reconstr_abuff->sf[1].gain = (compressed_buf[9] >> 3) & 0x3F;
+
+	reconstr_abuff->sf[1].pulse_val[0] = compressed_buf[9] & 7;
+	reconstr_abuff->sf[1].pulse_val[1] = (compressed_buf[10] >> 13) & 7;
+	reconstr_abuff->sf[1].pulse_val[2] = (compressed_buf[10] >> 10) & 7;
+	reconstr_abuff->sf[1].pulse_val[3] = (compressed_buf[10] >> 7) & 7;
+	reconstr_abuff->sf[1].pulse_val[4] = (compressed_buf[10] >> 4) & 7;
+	reconstr_abuff->sf[1].pulse_val[5] = (compressed_buf[10] >> 1) & 7;
+	reconstr_abuff->sf[1].pulse_val[6] = ((compressed_buf[11] >> 14) & 3)
+			+ 4 * (compressed_buf[10] & 1);
+
+	reconstr_abuff->subframe_something[2] = (compressed_buf[11] >> 9) & 0x1F;
 
 	reconstr_abuff->sf[2].combined_pulse_pos =
-			((abuff_swap_a2[13] >> 10) & 0x3F)
-					+ ((abuff_swap_a2[12]
-							+ ((abuff_swap_a2[11] & 0x1FF) << 16)) << 6);
+			  (compressed_buf[13] & 0xfc00) >> 10
+			| (compressed_buf[12] & 0xffff) << 6
+			| (compressed_buf[11] & 0x1ff) << 22;
 
-	reconstr_abuff->sf[2].gain = (abuff_swap_a2[13] >> 4) & 0x3F;
+	reconstr_abuff->sf[2].gain = (compressed_buf[13] >> 4) & 0x3F;
 
-	reconstr_abuff->sf[2].pulse_val[0] = (abuff_swap_a2[13] >> 1) & 7;
-	reconstr_abuff->sf[2].pulse_val[1] = ((abuff_swap_a2[14] >> 14) & 3)
-			+ 4 * (abuff_swap_a2[14] & 1);
-	reconstr_abuff->sf[2].pulse_val[2] = (abuff_swap_a2[14] >> 11) & 7;
-	reconstr_abuff->sf[2].pulse_val[3] = (abuff_swap_a2[14] >> 8) & 7;
-	reconstr_abuff->sf[2].pulse_val[4] = (abuff_swap_a2[14] >> 5) & 7;
-	reconstr_abuff->sf[2].pulse_val[5] = (abuff_swap_a2[14] >> 2) & 7;
-	reconstr_abuff->sf[2].pulse_val[6] = ((abuff_swap_a2[15] >> 15) & 1)
-			+ 2 * (abuff_swap_a2[14] & 3);
+	reconstr_abuff->sf[2].pulse_val[0] = (compressed_buf[13] >> 1) & 7;
+	reconstr_abuff->sf[2].pulse_val[1] = ((compressed_buf[14] >> 14) & 3)
+			+ 4 * (compressed_buf[14] & 1);
+	reconstr_abuff->sf[2].pulse_val[2] = (compressed_buf[14] >> 11) & 7;
+	reconstr_abuff->sf[2].pulse_val[3] = (compressed_buf[14] >> 8) & 7;
+	reconstr_abuff->sf[2].pulse_val[4] = (compressed_buf[14] >> 5) & 7;
+	reconstr_abuff->sf[2].pulse_val[5] = (compressed_buf[14] >> 2) & 7;
+	reconstr_abuff->sf[2].pulse_val[6] = ((compressed_buf[15] >> 15) & 1)
+			+ 2 * (compressed_buf[14] & 3);
 
-	reconstr_abuff->subframe_something[3] = (abuff_swap_a2[15] >> 10) & 0x1F;
+	reconstr_abuff->subframe_something[3] = (compressed_buf[15] >> 10) & 0x1F;
 
-	reconstr_abuff->sf[3].combined_pulse_pos = ((abuff_swap_a2[17] >> 11)
-			& 0x1F)
-			+ 32 * (abuff_swap_a2[16] + ((abuff_swap_a2[15] & 0x3FF) << 16));
-	reconstr_abuff->sf[3].gain = (abuff_swap_a2[17] >> 5) & 0x3F;
+	reconstr_abuff->sf[3].combined_pulse_pos =
+			  (compressed_buf[17] & 0xf800) >> 11
+			| (compressed_buf[16] & 0xffff) << 5
+			| (compressed_buf[15] & 0x3ff) << 21;
 
-	reconstr_abuff->sf[3].pulse_val[0] = (abuff_swap_a2[17] >> 2) & 7;
-	reconstr_abuff->sf[3].pulse_val[1] = ((abuff_swap_a2[18] >> 15) & 1)
-			+ 2 * (abuff_swap_a2[17] & 3);
-	reconstr_abuff->sf[3].pulse_val[2] = (abuff_swap_a2[18] >> 12) & 7;
-	reconstr_abuff->sf[3].pulse_val[3] = (abuff_swap_a2[18] >> 9) & 7;
-	reconstr_abuff->sf[3].pulse_val[4] = (abuff_swap_a2[18] >> 6) & 7;
-	reconstr_abuff->sf[3].pulse_val[5] = (abuff_swap_a2[18] >> 3) & 7;
-	reconstr_abuff->sf[3].pulse_val[6] = abuff_swap_a2[18] & 7;
+	reconstr_abuff->sf[3].gain = (compressed_buf[17] >> 5) & 0x3F;
+
+	reconstr_abuff->sf[3].pulse_val[0] = (compressed_buf[17] >> 2) & 7;
+	reconstr_abuff->sf[3].pulse_val[1] = ((compressed_buf[18] >> 15) & 1)
+			+ 2 * (compressed_buf[17] & 3);
+	reconstr_abuff->sf[3].pulse_val[2] = (compressed_buf[18] >> 12) & 7;
+	reconstr_abuff->sf[3].pulse_val[3] = (compressed_buf[18] >> 9) & 7;
+	reconstr_abuff->sf[3].pulse_val[4] = (compressed_buf[18] >> 6) & 7;
+	reconstr_abuff->sf[3].pulse_val[5] = (compressed_buf[18] >> 3) & 7;
+	reconstr_abuff->sf[3].pulse_val[6] = compressed_buf[18] & 7;
 
 ////////////////////////////////////////////////////////////////////
-	int subframe_idx;
 	for (subframe_idx = 0; subframe_idx < 4; subframe_idx++) {
 		unsigned int C72_binomials[PULSE_MAX] = { 72, 2556, 59640, 1028790,
 				13991544, 156238908, 1473109704, 3379081753 };
@@ -227,10 +167,10 @@ static void dss2_unpack_coeffs(struct struc_1 *reconstr_abuff, int16_t *abuff_sw
 		int index = 6;
 
 		if (combined_pulse_pos < C72_binomials[PULSE_MAX - 1]) {
-			if (word_3D0C26 != 0)
+			if (p->word_3D0C26 != 0)
 				goto LABEL_22;
 		} else
-				word_3D0C26 = 0;
+				p->word_3D0C26 = 0;
 
 		/* why do we need this? */
 		reconstr_abuff->sf[subframe_idx].pulse_pos[6] = 0;
@@ -255,7 +195,7 @@ static void dss2_unpack_coeffs(struct struc_1 *reconstr_abuff, int16_t *abuff_sw
 		};
 		////////////////////////////
 
-		if (word_3D0C26) {
+		if (p->word_3D0C26) {
 			int pulse, pulse_idx;
 			LABEL_22: pulse = PULSE_MAX - 1;
 			pulse_idx = 71; //GRID_SIZE
@@ -279,26 +219,20 @@ static void dss2_unpack_coeffs(struct struc_1 *reconstr_abuff, int16_t *abuff_sw
 	}
 
 /////////////////////////////////////////////////////////////////////////
-	int16_t v43;
-	int v46;
+	v43 = (compressed_buf[19] & 0xffff) << 8;
 
-	v43 = abuff_swap_a2[19];
+	v46 = (v43 | ((compressed_buf[20] & 0xff00) >> 8)) / 151;
 
-	v46 = ((v43 << 8) + *((int8_t *) abuff_swap_a2 + 0x29)) / 151;
-	// TODO, is filed_1e part of array_20?
-	reconstr_abuff->filed_1e =
-			((v43 << 8) + *((int8_t *) abuff_swap_a2 + 0x29)) % 151 + 36;
-	for (i = 0; i < 3; i++) {
+	reconstr_abuff->array_20[0] =
+			(v43 | ((compressed_buf[20] & 0xff00) >> 8)) % 151 + 36;
+	for (i = 1; i < SUBFRAMES; i++) {
 		int v47 = v46;
 		v46 /= 48;
 		reconstr_abuff->array_20[i] = v47 - 48 * v46;
 	}
 ////////////////////////////////////////////////////////////////////////
-	int16_t v51;
-	int16_t v48;
-
-	v48 = reconstr_abuff->filed_1e;
-	for (i = 0; i < 3; i++) {
+	v48 = reconstr_abuff->array_20[0];
+	for (i = 1; i < SUBFRAMES; i++) {
 		if (v48 > 162) {
 			reconstr_abuff->array_20[i] += 139;
 		} else {
@@ -314,15 +248,15 @@ static void dss2_unpack_coeffs(struct struc_1 *reconstr_abuff, int16_t *abuff_sw
 }
 
 /* create stage 1 array14_stage0 based on stage0 and some kind of pulse table */
-static void dss2_sub_3B8740(int32_t *array14_stage1, const struct struc_1 *a2) {
+static void dss_sp_sub_3B8740(int32_t *array14_stage1, const struct struc_1 *a2) {
 	int i;
 
 	for (i = 0; i < 14; i++)
 		array14_stage1[i] = g_unc_array_3C84F0[i][a2->array14_stage0[i]];
 }
 
-static void dss2_sub_3B8410(struct struc_6 *struc_6_a1,
-		struct struc_8 *struc_6_stg2_a2) {
+static void dss_sp_sub_3B8410(struct struc_6 *struc_6_a1,
+		int32_t *struc_6_stg2_a2) {
 	int v3; // esi@1
 	int v5; // ebx@2
 	signed int v6; // eax@2
@@ -334,11 +268,11 @@ static void dss2_sub_3B8410(struct struc_6 *struc_6_a1,
 	int tmp;
 
 	v3 = 0;
-	struc_6_stg2_a2->array14_stage2[0] = 0x2000u;
+	struc_6_stg2_a2[0] = 0x2000;
 	while (1) {
 		v5 = v3;
 		v6 = v3 + 1;
-		struc_6_stg2_a2->array14_stage2[v3] = struc_6_a1->array14_stage1[v3] >> 2;
+		struc_6_stg2_a2[v3 + 1] = struc_6_a1->array14_stage1[v3] >> 2;
 		if (v6 / 2 >= 1)
 			break;
 		LABEL_9: ++v3;
@@ -349,18 +283,18 @@ static void dss2_sub_3B8410(struct struc_6 *struc_6_a1,
 	/////////////////////////////
 	counter = 1;
 	while (1) {
-		v7 = struc_6_stg2_a2->array14_stage2[counter - 1];
+		v7 = struc_6_stg2_a2[counter];
 		// 4, 4, 4
-		v8 = struc_6_stg2_a2->array14_stage2[v5 - counter];
+		v8 = struc_6_stg2_a2[1 + v5 - counter];
 		// 8, 8, c
 		tmp = (struc_6_a1->array14_stage1[v5] * v8 + (v7 << 15) + 0x4000) >> 15;
-		struc_6_stg2_a2->array14_stage2[counter - 1] = tmp;
+		struc_6_stg2_a2[counter] = tmp;
 		tmp &= 0xFFFF8000;
 		if (tmp && tmp != 0xFFFF8000)
 			break;
 
 		tmp = (struc_6_a1->array14_stage1[v5] * v7 + (v8 << 15) + 0x4000) >> 15;
-		struc_6_stg2_a2->array14_stage2[v5 - counter] = tmp;
+		struc_6_stg2_a2[1 + v5 - counter] = tmp;
 		tmp &= 0xFFFF8000;
 		if (tmp && tmp != 0xFFFF8000)
 			break;
@@ -370,10 +304,70 @@ static void dss2_sub_3B8410(struct struc_6 *struc_6_a1,
 			goto LABEL_9;
 	}
 	printf("%s should never be here\n", __func__);
+#if 0
+	struct struc_6 *struc_6_v14 = struc_6_a1;
+	int v24, v14 = 0;
+	int word_3D9B7C = 1;
+	struc_6_stg2_a2[0] = 0x1000;
+	int v26 = 0;
+	struct struc_6 *struc_6_v29 = struc_6_a1;
+	int32_t *array14a = struc_6_stg2_a2;
+	int v28 = 14;
+	do
+	{
+		int v15 = v14 + 1;
+		*array14a = struc_6_v14->array14_stage1[0] >> 3;
+		counter = 1;
+		int v30 = v14 + 1;
+		int v29 = (v14 + 1) / 2;
+		if ( (v14 + 1) / 2 >= 1 )
+		{
+			int v16 = 1;
+			while ( 1 )
+			{
+				int v17 = v14 - v16;
+				int v19 = struc_6_stg2_a2[v17 + 1];
+
+				tmp = (struc_6_v14->array14_stage1[0] * v19 + (struc_6_stg2_a2[v16] << 15) + 0x4000) >> 15;
+				struc_6_stg2_a2[v16] = tmp;
+				tmp &= 0xFFFF8000;
+				if ( tmp && tmp != 0xFFFF8000 )
+					struc_6_stg2_a2[v16] = ((tmp <= 0) - 1) - 0x8000;
+
+				struc_6_v14 = struc_6_v29;
+
+				int v22 = (struc_6_stg2_a2[v16] * struc_6_v29->array14_stage1[0] + (v19 << 15) + 0x4000) >> 15;
+				struc_6_stg2_a2[v17] = v22;
+				v22 &= 0xFFFF8000;
+				if ( v22 && v22 != 0xFFFF8000 )
+				{
+					if ( v22 <= 0 )
+						struc_6_stg2_a2[v17] = 0xFFFF8000;
+					else
+						struc_6_stg2_a2[v17] = 0x7FFF;
+				}
+				++counter;
+				v16 = counter;
+				if ( counter > v29 )
+				break;
+				v14 = v26;
+			}
+			v15 = v30;
+		}
+		v14 = v15;
+		struc_6_v14 = (struct struc_6 *)((char *)struc_6_v14 + 4);
+		v24 = v28 == 1;
+		v26 = v15;
+		array14a++;
+		struc_6_v29 = struc_6_v14;
+		--v28;
+	}
+	while ( !v24 );
+#endif
 }
 
 /* this function will get pointer to one of 4 subframes */
-static void dss2_add_pulses(int32_t *array72_a1, const struct dss2_subframe *sf) {
+static void dss_sp_add_pulses(int32_t *array72_a1, const struct dss2_subframe *sf) {
 	int i;
 
 	//looks like "output[sf->pulse_pos[i]] += g_gains[sf->gain] * g_pulse_val[sf->pulse_val[i]] + 0x4000 >> 15;"
@@ -383,7 +377,7 @@ static void dss2_add_pulses(int32_t *array72_a1, const struct dss2_subframe *sf)
 
 }
 
-static void dss2_sub_3B9080(int32_t *array72, int32_t *array36, int a3, int a4) {
+static void dss_sp_sub_3B9080(int32_t *array72, int32_t *array36, int a3, int a4) {
 
 	int i;
 
@@ -405,7 +399,7 @@ static void dss2_sub_3B9080(int32_t *array72, int32_t *array36, int a3, int a4) 
 	};
 }
 
-static void dss2_normalize(int32_t *array_a1, int normalize_bits, int array_a1_size) {
+static void dss_sp_normalize(int32_t *array_a1, int normalize_bits, int array_a1_size) {
 	int i;
 
 	if (array_a1_size <= 0)
@@ -419,18 +413,18 @@ static void dss2_normalize(int32_t *array_a1, int normalize_bits, int array_a1_s
 			array_a1[i] = array_a1[i] << normalize_bits;
 }
 
-static void dss2_sub_3B9FB0(int32_t *array72, int32_t *arrayXX) {
+static void dss_sp_sub_3B9FB0(int32_t *array72, int32_t *arrayXX) {
 	int i;
 
-	for (i = 0; i < 114; i++)
-		arrayXX[114 - i] = arrayXX[186 - i];
+	for (i = 114; i > 0; i--)
+		arrayXX[i + 72] = arrayXX[i];
 
 	for (i = 0; i < 72; i++)
 		arrayXX[72 - i] = array72[i];
 }
 
-static void dss2_shift_sq_sub(const int32_t *array_a1, int32_t *array_a2,
-		int32_t *array_a3_dst) {
+static void dss_sp_shift_sq_sub(const int32_t *array_a1,
+		int32_t *array_a2, int32_t *array_a3_dst) {
 	int a;
 
 	for (a = 0; a < 72; a++) {
@@ -442,7 +436,7 @@ static void dss2_shift_sq_sub(const int32_t *array_a1, int32_t *array_a2,
 			tmp -= array_a2[i] * array_a1[i];
 
 		/* original code overwrite array_a2[1] two times - makes no sense for me. */
-		for (i = 14; i > 1; i--)
+		for (i = 14; i > 0; i--)
 			array_a2[i] = array_a2[i - 1];
 
 		tmp = (tmp + 4096) >> 13;
@@ -460,7 +454,7 @@ static void dss2_shift_sq_sub(const int32_t *array_a1, int32_t *array_a2,
 	}
 }
 
-static void dss2_shift_sq_add(const int32_t *array_a1, int32_t *array_a2,
+static void dss_sp_shift_sq_add(const int32_t *array_a1, int32_t *array_a2,
 		int32_t *array_a3_dst) {
 	int a;
 
@@ -484,18 +478,17 @@ static void dss2_shift_sq_add(const int32_t *array_a1, int32_t *array_a2,
 	}
 }
 
-static void dss2_vec_mult(const int32_t *array15_ro_src, int32_t *array15_dst,
+static void dss_sp_vec_mult(const int32_t *array15_ro_src, int32_t *array15_dst,
 		const int32_t *array15_ro_a3) {
 	int i;
 
 	array15_dst[0] = array15_ro_src[0];
 
-	/* TODO: pseudocode and my result are too different. May be my version is wrong */
-	for (i = 1; i < 14; i++)
+	for (i = 1; i < 15; i++)
 		array15_dst[i] = (array15_ro_src[i] * array15_ro_a3[i] + 0x4000) >> 15;
 }
 
-static int dss2_get_normalize_bits(int32_t *array_var, int16_t size) {
+static int dss_sp_get_normalize_bits(int32_t *array_var, int16_t size) {
 	unsigned int val;
 	int max_val;
 	int i;
@@ -512,39 +505,41 @@ static int dss2_get_normalize_bits(int32_t *array_var, int16_t size) {
 	return max_val;
 }
 
-static void dss2_sub_3B80F0(int32_t a0, int32_t *array15_a1, int32_t *array72_a3,
+static void dss_sp_sub_3B80F0(DSS_SP_Context *p, int32_t a0,
 		int32_t *array72_a4, int size) {
 
 	int32_t local_rw_array15_v1a[15];
 	int32_t local_rw_array15_v39[15];
-	int32_t local_rw_array_v41[73];
+	int32_t local_rw_array_v41[72];
 	int v11, v22, v23, v18, v34, v36, normalize_bits;
 	int i, tmp;
 
 	v34 = 0;
 	if (size > 0) {
 		for (i = 0; i < size; i++)
-			v34 += abs(array72_a3[i]);
+			v34 += abs(p->g_unc_rw_array72_3D0C44[i]);
 
 		if (v34 > 0xFFFFF)
 			v34 = 0xFFFFF;
 	}
 
-	normalize_bits = dss2_get_normalize_bits(array72_a3, size);
+	normalize_bits = dss_sp_get_normalize_bits(p->g_unc_rw_array72_3D0C44, size);
 
-	dss2_normalize(array72_a3, normalize_bits - 3, size);
-	dss2_normalize(g_unc_rw_array15_3D0420, normalize_bits, 15);
-	dss2_normalize(g_unc_rw_array15_3D045C, normalize_bits, 15);
+	dss_sp_normalize(p->g_unc_rw_array72_3D0C44, normalize_bits - 3, size);
+	dss_sp_normalize(p->g_unc_rw_array15_3D0420, normalize_bits, 15);
+	dss_sp_normalize(p->g_unc_rw_array15_3D045C, normalize_bits, 15);
 
-	v36 = g_unc_rw_array15_3D045C[1];
+	v36 = p->g_unc_rw_array15_3D045C[1];
 
-	dss2_vec_mult(array15_a1, local_rw_array15_v39, g_unc_ro_array37_3C845C);
-	dss2_shift_sq_add(local_rw_array15_v39, g_unc_rw_array15_3D0420,
-			array72_a3);
+	dss_sp_vec_mult(p->g_unc_rw_array15_stg2_3D08C0, local_rw_array15_v39,
+			binary_decreasing_array);
+	dss_sp_shift_sq_add(local_rw_array15_v39, p->g_unc_rw_array15_3D0420,
+			p->g_unc_rw_array72_3D0C44);
 
-	dss2_vec_mult(array15_a1, local_rw_array15_v1a, g_unc_ro_array15_3C8420);
-	dss2_shift_sq_sub(local_rw_array15_v1a, g_unc_rw_array15_3D045C,
-			array72_a3);
+	dss_sp_vec_mult(p->g_unc_rw_array15_stg2_3D08C0, local_rw_array15_v1a,
+			dss_sp_unc_decreasing_array);
+	dss_sp_shift_sq_sub(local_rw_array15_v1a,
+			p->g_unc_rw_array15_3D045C, p->g_unc_rw_array72_3D0C44);
 
 	/* a0 can be negative */
 	v11 = a0 >> 1;
@@ -553,29 +548,29 @@ static void dss2_sub_3B80F0(int32_t a0, int32_t *array15_a1, int32_t *array72_a3
 
 	if (size > 1) {
 		for (i = size - 1; i > 0; i--) {
-			tmp = ((v11 * array72_a3[i - 1] + (array72_a3[i] << 15)) + 0x4000)
+			tmp = ((v11 * p->g_unc_rw_array72_3D0C44[i - 1] + (p->g_unc_rw_array72_3D0C44[i] << 15)) + 0x4000)
 					>> 15;
-			array72_a3[i] = tmp;
+			p->g_unc_rw_array72_3D0C44[i] = tmp;
 			tmp &= 0xFFFF8000;
 			if (tmp && tmp != 0xFFFF8000)
-				array72_a3[i] = (((tmp <= 0) - 1) & 0xFFFE) - 0x7FFF;
+				p->g_unc_rw_array72_3D0C44[i] = (((tmp <= 0) - 1) & 0xFFFE) - 0x7FFF;
 		}
 	}
 
-	tmp = (v36 * v11 + (array72_a3[0] << 15) + 16384) >> 15;
-	array72_a3[0] = tmp;
+	tmp = (v36 * v11 + (p->g_unc_rw_array72_3D0C44[0] << 15) + 16384) >> 15;
+	p->g_unc_rw_array72_3D0C44[0] = tmp;
 	tmp &= 0xFFFF8000;
 	if (tmp && tmp != 0xFFFF8000)
-		array72_a3[0] = (((tmp <= 0) - 1) & 0xFFFE) - 0x7FFF;
+		p->g_unc_rw_array72_3D0C44[0] = (((tmp <= 0) - 1) & 0xFFFE) - 0x7FFF;
 
-	dss2_normalize(array72_a3, -normalize_bits, size);
-	dss2_normalize(g_unc_rw_array15_3D0420, -normalize_bits, 15);
-	dss2_normalize(g_unc_rw_array15_3D045C, -normalize_bits, 15);
+	dss_sp_normalize(p->g_unc_rw_array72_3D0C44, -normalize_bits, size);
+	dss_sp_normalize(p->g_unc_rw_array15_3D0420, -normalize_bits, 15);
+	dss_sp_normalize(p->g_unc_rw_array15_3D045C, -normalize_bits, 15);
 
 	v18 = 0;
 	if (size > 0)
 		for (i = 0; i < size; i++)
-			v18 += abs(array72_a3[i]);
+			v18 += abs(p->g_unc_rw_array72_3D0C44[i]);
 
 	if (v18 & 0xFFFFFFC0)
 		v22 = (v34 << 11) / v18;
@@ -583,14 +578,14 @@ static void dss2_sub_3B80F0(int32_t a0, int32_t *array15_a1, int32_t *array72_a3
 		v22 = 1;
 
 	v23 = 409 * v22 >> 15 << 15;
-	tmp = (v23 + 32358 * dword_3D0498) >> 15;
+	tmp = (v23 + 32358 * p->dword_3D0498) >> 15;
 	local_rw_array_v41[0] = tmp;
 	tmp &= 0xFFFF8000;
 	if (tmp && tmp != 0xFFFF8000)
 		local_rw_array_v41[0] = (((tmp <= 0) - 1) & 0xFFFE) - 0x7FFF;
 
 	if (size > 1) {
-		for (i = 1; i < size - 1; i++) {
+		for (i = 1; i < size; i++) {
 			tmp = (v23 + 32358 * local_rw_array_v41[i - 1]) >> 15;
 			local_rw_array_v41[i] = tmp;
 			tmp &= 0xFFFF8000;
@@ -599,10 +594,10 @@ static void dss2_sub_3B80F0(int32_t a0, int32_t *array15_a1, int32_t *array72_a3
 		}
 	}
 
-	dword_3D0498 = local_rw_array_v41[size];
+	p->dword_3D0498 = local_rw_array_v41[size - 1];
 	if (size > 0) {
 		for (i = 0; i < size; i++) {
-			tmp = (array72_a3[i] * local_rw_array_v41[i]) >> 11;
+			tmp = (p->g_unc_rw_array72_3D0C44[i] * local_rw_array_v41[i]) >> 11;
 			array72_a4[i] = tmp;
 			tmp &= 0xFFFF8000;
 			if (tmp && tmp != 0xFFFF8000)
@@ -611,28 +606,29 @@ static void dss2_sub_3B80F0(int32_t a0, int32_t *array15_a1, int32_t *array72_a3
 	}
 }
 
-static void dss2_sub_3B98D0(int32_t *array72_a1) {
+static void dss_sp_sub_3B98D0(DSS_SP_Context *p, int32_t *array72_a1) {
 	int v1;
 
 	signed int v10;
 
 	int v12;
-	int i, offset, counter;
+	int i, offset, counter, array_size;
 
 	v1 = 0;
 
 	for (i = 0; i < 6; i++)
-		g_unc_rw_array288_3D0DC0[i] = g_unc_rw_array288_3D0DC0[288 + i];
+		p->g_unc_rw_array288_3D0DC0[i] = p->g_unc_rw_array288_3D0DC0[288 + i];
 
-	for (i = 0; i < 72; i++)
-		g_unc_rw_array288_3D0DC0[6 + i] = array72_a1[i];
+	for (i = 0; i < 72 * SUBFRAMES; i++)
+		p->g_unc_rw_array288_3D0DC0[6 + i] = array72_a1[i];
 
 	offset = 6;
 	counter = 0;
+	array_size = sizeof(p->g_unc_rw_array288_3D0DC0) / sizeof(int32_t);
 	do {
 		v10 = 0;
 		for (i = 0; i < 6; i++)
-			v10 += g_unc_rw_array288_3D0DC0[offset--]
+			v10 += p->g_unc_rw_array288_3D0DC0[offset--]
 					* g_unc_array_3C9288[v1 + i * 11];
 
 		offset += 7;
@@ -648,10 +644,10 @@ static void dss2_sub_3B98D0(int32_t *array72_a1) {
 		v1 = (v1 + 1) % 11;
 		if (!v1)
 			offset++;
-	} while (offset < sizeof(g_unc_rw_array288_3D0DC0) / sizeof(int32_t));
+	} while (offset < array_size);
 }
 
-static void dss2_32to16bit(int16_t *dst, int32_t *src, int size) {
+static void dss_sp_32to16bit(int16_t *dst, int32_t *src, int size) {
 	int i;
 
 	if (!size)
@@ -661,102 +657,101 @@ static void dss2_32to16bit(int16_t *dst, int32_t *src, int size) {
 		dst[i] = src[i];
 }
 
-#if 0
-static void dss2_clean_array_3B9060()
-{
-  memset(g_unc_rw_arrayXX_3D08FC, 0, 0x2ECu);
-}
-#endif
+static int dss_sp_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t *abuff_src) {
 
-static int dss2_2_sub_3B8790(int16_t *abuf_dst, int8_t *abuff_src) {
-
-	struct struc_1 *struc_1_v46; // [sp-C0h] [bp-61Ch]@12
-
-	struct struc_1 struc_1_v96; // [sp+1Ch] [bp-540h]@5
-	int32_t local_rw_array72_v101[SUBFRAMES][72];
 	int i, tmp, sf_idx;
-	int8_t abuff_swap[42];
 
+	dss_sp_unpack_coeffs(p, &p->struc_1_v96, (const int16_t *)abuff_src);
 
-	//memcpy(&v50, &a6, 24u);
+	dss_sp_sub_3B8740(p->g_unc_rw_array14_stg1_3D0D64.array14_stage1, &p->struc_1_v96);
 
-	dss2_byte_swap(abuff_swap, abuff_src);
-
-#if 0
-	if (*dec_flag & 0x1) {
-		dss2_clean_array_3B9060();
-		*dec_flag &= ~0x1;
-		word_3D0C26 = 1;
-	}
-#endif
-
-	dss2_unpack_coeffs(&struc_1_v96, (int16_t *)abuff_swap);
-
-	memcpy(&struc_1_v46, &struc_1_v96, 192u);
-	dss2_sub_3B8740(g_unc_rw_array14_stg1_3D0D64.array14_stage1, struc_1_v46);
-
-	dss2_sub_3B8410(&g_unc_rw_array14_stg1_3D0D64,
-			&g_unc_rw_array15_stg2_3D08C0);
+	dss_sp_sub_3B8410(&p->g_unc_rw_array14_stg1_3D0D64,
+			p->g_unc_rw_array15_stg2_3D08C0);
 
 ////////
 	for (sf_idx = 0; sf_idx < SUBFRAMES; sf_idx++) {
 
-		dss2_sub_3B9080(g_unc_rw_array72_3D0C44, g_unc_rw_arrayXX_3D08FC,
-				struc_1_v96.filed_1e,
-				g_unc_array_3C88F8[struc_1_v96.subframe_something[sf_idx]]);
+		dss_sp_sub_3B9080(p->g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC,
+				p->struc_1_v96.array_20[sf_idx],
+				g_unc_array_3C88F8[p->struc_1_v96.subframe_something[sf_idx]]);
 
-		dss2_add_pulses(g_unc_rw_array72_3D0C44, &struc_1_v96.sf[sf_idx]);
+		dss_sp_add_pulses(p->g_unc_rw_array72_3D0C44, &p->struc_1_v96.sf[sf_idx]);
 
-		dss2_sub_3B9FB0(g_unc_rw_array72_3D0C44, g_unc_rw_arrayXX_3D08FC);
+		dss_sp_sub_3B9FB0(p->g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC);
 
 		/* swap and copy buffer */
 		for (i = 0; i < 72; i++)
-			g_unc_rw_array72_3D0C44[i] = g_unc_rw_arrayXX_3D08FC[71 - i];
+			p->g_unc_rw_array72_3D0C44[i] = p->g_unc_rw_arrayXX_3D08FC[72 - i];
 
-		/* TODO: find what happens with g_unc_rw_array15_3D0BE8 */
-		dss2_shift_sq_sub(g_unc_rw_array15_stg2_3D08C0.array14_stage2,
-				g_unc_rw_array15_3D0BE8.array14_stage2, g_unc_rw_array72_3D0C44);
+		dss_sp_shift_sq_sub(p->g_unc_rw_array15_stg2_3D08C0,
+				p->g_unc_rw_array15_3D0BE8, p->g_unc_rw_array72_3D0C44);
 
 		for (i = 0; i < 72; i++) {
-			tmp = (((dword_3D0DA0 << 13) - dword_3D0DA0)
-					+ (g_unc_rw_array72_3D0C44[i] << 15) + 0x4000) >> 15;
-			g_unc_rw_array72_3D0C44[i] = tmp;
+			tmp = (((p->dword_3D0DA0 << 13) - p->dword_3D0DA0)
+					+ (p->g_unc_rw_array72_3D0C44[i] << 15) + 0x4000) >> 15;
+			p->g_unc_rw_array72_3D0C44[i] = tmp;
 			tmp &= 0xFFFF8000;
 			if (tmp && tmp != 0xFFFF8000) {
-				dword_3D0DA0 = (((tmp <= 0) - 1) & 0xFFFE) - 0x7FFF;
-				g_unc_rw_array72_3D0C44[i] = dword_3D0DA0;
+				p->dword_3D0DA0 = (((tmp <= 0) - 1) & 0xFFFE) - 0x7FFF;
+				p->g_unc_rw_array72_3D0C44[i] = p->dword_3D0DA0;
 			}
 		}
 
-		dss2_sub_3B80F0(g_unc_rw_array14_stg1_3D0D64.array14_stage1[0],
-				g_unc_rw_array15_stg2_3D08C0.array14_stage2, g_unc_rw_array72_3D0C44,
-				&local_rw_array72_v101[sf_idx][0], 72);
+		dss_sp_sub_3B80F0(p, p->g_unc_rw_array14_stg1_3D0D64.array14_stage1[0],
+				&p->local_rw_array72_v101[sf_idx][0], 72);
 
 	};
 ////////
 
-	dss2_sub_3B98D0(&local_rw_array72_v101[0][0]);
+	dss_sp_sub_3B98D0(p, &p->local_rw_array72_v101[0][0]);
 
-	dss2_32to16bit(abuf_dst,
-					&local_rw_array72_v101[0][0], 264);
-	memcpy(&array14_3D0DA4, struc_1_v96.array14_stage0, 28u);
+	dss_sp_32to16bit(abuf_dst,
+					&p->local_rw_array72_v101[0][0], 264);
+	memcpy(&p->array14_3D0DA4, p->struc_1_v96.array14_stage0, 28u);
 	return 0;
 
 }
 
-int main(void) {
-	int8_t *abuff_src;
-	int16_t *abuff_dst;
+static int dss_sp_decode_frame(AVCodecContext *avctx, void *data,
+                               int *got_frame_ptr, AVPacket *avpkt)
+{
+    DSS_SP_Context *p  = avctx->priv_data;
+    AVFrame *frame     = data;
+    const uint8_t *buf = avpkt->data;
+    int buf_size       = avpkt->size;
+
+    int16_t *out;
+    int ret;
+
+    if (buf_size < DSS_SP_FRAME_SIZE) {
+        if (buf_size)
+            av_log(avctx, AV_LOG_WARNING,
+                   "Expected %d bytes, got %d - skipping packet\n",
+                   DSS_SP_FRAME_SIZE, buf_size);
+        *got_frame_ptr = 0;
+        return buf_size;
+    }
+
+    frame->nb_samples = DSS_SP_SAMPLE_COUNT;
+    if ((ret = ff_get_buffer(avctx, frame, 0)) < 0) {
+         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
+         return ret;
+    }
+
+    out = (int16_t *)frame->data[0];
 
 
-	dss2_2_sub_3B8790(abuff_dst, abuff_src);
-	return 0;
+    /* process frame here */
+    dss_sp_2_sub_3B8790(p, out, buf);
+
+    *got_frame_ptr = 1;
+
+    return DSS_SP_FRAME_SIZE;
 }
 
 static const AVClass dss_sp_dec_class = {
     .class_name = "DSS SP decoder",
     .item_name  = av_default_item_name,
-    .option     = options,
     .version    = LIBAVUTIL_VERSION_INT,
 };
 
@@ -768,6 +763,5 @@ AVCodec ff_dss_sp_decoder = {
     .priv_data_size = sizeof(DSS_SP_Context),
     .init           = dss_sp_decode_init,
     .decode         = dss_sp_decode_frame,
-    .capabilities   = CODEC_CAP_SUBFRAMES,
     .priv_class     = &dss_sp_dec_class,
 };
