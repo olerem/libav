@@ -5,11 +5,21 @@
  *      Autor: lex
  */
 
+#define BITSTREAM_READER_LE
+#include "libavutil/channel_layout.h"
+#include "libavutil/mem.h"
+#include "libavutil/opt.h"
+#include "avcodec.h"
+#include "get_bits.h"
+#include "acelp_vectors.h"
+#include "celp_filters.h"
+#include "internal.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include "dss.h"
+#include "dss_sp_dec_data.h"
 
 unsigned int word_3D1266;
 
@@ -26,63 +36,26 @@ int32_t g_unc_rw_arrayXX_3D08FC[186];
 int16_t word_3D9B7E;
 int dword_3D0DA0;
 struct struc_8 g_unc_rw_array15_3D0BE8;
-int32_t g_unc_rw_array288_3D0DC0[288 + 6];
+
 int32_t g_unc_rw_array_3D04A0[264];
 
 typedef struct dss_sp_context {
     AVClass *class;
+    int32_t g_unc_rw_array288_3D0DC0[288 + 6];
 
-    G723_1_Subframe subframe[4];
-    enum FrameType cur_frame_type;
-    enum FrameType past_frame_type;
-    enum Rate cur_rate;
-    uint8_t lsp_index[LSP_BANDS];
-    int pitch_lag[2];
-    int erased_frames;
-
-    int16_t prev_lsp[LPC_ORDER];
-    int16_t sid_lsp[LPC_ORDER];
-    int16_t prev_excitation[PITCH_MAX];
-    int16_t excitation[PITCH_MAX + FRAME_LEN + 4];
-    int16_t synth_mem[LPC_ORDER];
-    int16_t fir_mem[LPC_ORDER];
-    int     iir_mem[LPC_ORDER];
-
-    int random_seed;
-    int cng_random_seed;
-    int interp_index;
-    int interp_gain;
-    int sid_gain;
-    int cur_gain;
-    int reflection_coef;
-    int pf_gain;
-    int postfilter;
-
-    int16_t audio[FRAME_LEN + LPC_ORDER + PITCH_MAX + 4];
 } DSS_SP_Context;
 
 static av_cold int dss_sp_decode_init(AVCodecContext *avctx)
 {
-    DSS_SP_Context *p = avctx->priv_data;
-
     avctx->channel_layout = AV_CH_LAYOUT_MONO;
     avctx->sample_fmt     = AV_SAMPLE_FMT_S16;
     avctx->channels       = 1;
     avctx->sample_rate    = 12000;
-    p->pf_gain            = 1 << 12;
-
-#if 0
-    memcpy(p->prev_lsp, dc_lsp, LPC_ORDER * sizeof(*p->prev_lsp));
-    memcpy(p->sid_lsp,  dc_lsp, LPC_ORDER * sizeof(*p->sid_lsp));
-
-    p->cng_random_seed = CNG_RANDOM_SEED;
-    p->past_frame_type = SID_FRAME;
-#endif
 
     return 0;
 }
 
-static void dss2_byte_swap(int8_t *abuff_swap, int8_t *abuff_src) {
+static void dss2_byte_swap(int8_t *abuff_swap, const int8_t *abuff_src) {
 	uint8_t *abuff_tmp;
 	int size; // si@1
 	int i;
@@ -125,8 +98,12 @@ static void dss2_byte_swap(int8_t *abuff_swap, int8_t *abuff_src) {
 
 static void dss2_unpack_coeffs(struct struc_1 *reconstr_abuff, int16_t *abuff_swap_a2) {
 
-	int v12; // edx@2
 	int i;
+	int subframe_idx;
+	int16_t v43;
+	int v46;
+	int16_t v51;
+	int16_t v48;
 
 	reconstr_abuff->array14_stage0[0] = (abuff_swap_a2[0] >> 11) & 0x1F;
 	reconstr_abuff->array14_stage0[1] = (abuff_swap_a2[0] >> 6) & 0x1F;
@@ -218,7 +195,6 @@ static void dss2_unpack_coeffs(struct struc_1 *reconstr_abuff, int16_t *abuff_sw
 	reconstr_abuff->sf[3].pulse_val[6] = abuff_swap_a2[18] & 7;
 
 ////////////////////////////////////////////////////////////////////
-	int subframe_idx;
 	for (subframe_idx = 0; subframe_idx < 4; subframe_idx++) {
 		unsigned int C72_binomials[PULSE_MAX] = { 72, 2556, 59640, 1028790,
 				13991544, 156238908, 1473109704, 3379081753 };
@@ -279,9 +255,6 @@ static void dss2_unpack_coeffs(struct struc_1 *reconstr_abuff, int16_t *abuff_sw
 	}
 
 /////////////////////////////////////////////////////////////////////////
-	int16_t v43;
-	int v46;
-
 	v43 = abuff_swap_a2[19];
 
 	v46 = ((v43 << 8) + *((int8_t *) abuff_swap_a2 + 0x29)) / 151;
@@ -294,9 +267,6 @@ static void dss2_unpack_coeffs(struct struc_1 *reconstr_abuff, int16_t *abuff_sw
 		reconstr_abuff->array_20[i] = v47 - 48 * v46;
 	}
 ////////////////////////////////////////////////////////////////////////
-	int16_t v51;
-	int16_t v48;
-
 	v48 = reconstr_abuff->filed_1e;
 	for (i = 0; i < 3; i++) {
 		if (v48 > 162) {
@@ -611,7 +581,7 @@ static void dss2_sub_3B80F0(int32_t a0, int32_t *array15_a1, int32_t *array72_a3
 	}
 }
 
-static void dss2_sub_3B98D0(int32_t *array72_a1) {
+static void dss2_sub_3B98D0(DSS_SP_Context *p, int32_t *array72_a1) {
 	int v1;
 
 	signed int v10;
@@ -622,17 +592,17 @@ static void dss2_sub_3B98D0(int32_t *array72_a1) {
 	v1 = 0;
 
 	for (i = 0; i < 6; i++)
-		g_unc_rw_array288_3D0DC0[i] = g_unc_rw_array288_3D0DC0[288 + i];
+		p->g_unc_rw_array288_3D0DC0[i] = p->g_unc_rw_array288_3D0DC0[288 + i];
 
 	for (i = 0; i < 72; i++)
-		g_unc_rw_array288_3D0DC0[6 + i] = array72_a1[i];
+		p->g_unc_rw_array288_3D0DC0[6 + i] = array72_a1[i];
 
 	offset = 6;
 	counter = 0;
 	do {
 		v10 = 0;
 		for (i = 0; i < 6; i++)
-			v10 += g_unc_rw_array288_3D0DC0[offset--]
+			v10 += p->g_unc_rw_array288_3D0DC0[offset--]
 					* g_unc_array_3C9288[v1 + i * 11];
 
 		offset += 7;
@@ -648,7 +618,7 @@ static void dss2_sub_3B98D0(int32_t *array72_a1) {
 		v1 = (v1 + 1) % 11;
 		if (!v1)
 			offset++;
-	} while (offset < sizeof(g_unc_rw_array288_3D0DC0) / sizeof(int32_t));
+	} while (offset < sizeof(p->g_unc_rw_array288_3D0DC0) / sizeof(int32_t));
 }
 
 static void dss2_32to16bit(int16_t *dst, int32_t *src, int size) {
@@ -668,9 +638,9 @@ static void dss2_clean_array_3B9060()
 }
 #endif
 
-static int dss2_2_sub_3B8790(int16_t *abuf_dst, int8_t *abuff_src) {
+static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t *abuff_src) {
 
-	struct struc_1 *struc_1_v46; // [sp-C0h] [bp-61Ch]@12
+	struct struc_1 struc_1_v46; // [sp-C0h] [bp-61Ch]@12
 
 	struct struc_1 struc_1_v96; // [sp+1Ch] [bp-540h]@5
 	int32_t local_rw_array72_v101[SUBFRAMES][72];
@@ -693,7 +663,7 @@ static int dss2_2_sub_3B8790(int16_t *abuf_dst, int8_t *abuff_src) {
 	dss2_unpack_coeffs(&struc_1_v96, (int16_t *)abuff_swap);
 
 	memcpy(&struc_1_v46, &struc_1_v96, 192u);
-	dss2_sub_3B8740(g_unc_rw_array14_stg1_3D0D64.array14_stage1, struc_1_v46);
+	dss2_sub_3B8740(g_unc_rw_array14_stg1_3D0D64.array14_stage1, &struc_1_v46);
 
 	dss2_sub_3B8410(&g_unc_rw_array14_stg1_3D0D64,
 			&g_unc_rw_array15_stg2_3D08C0);
@@ -735,7 +705,7 @@ static int dss2_2_sub_3B8790(int16_t *abuf_dst, int8_t *abuff_src) {
 	};
 ////////
 
-	dss2_sub_3B98D0(&local_rw_array72_v101[0][0]);
+	dss2_sub_3B98D0(p, &local_rw_array72_v101[0][0]);
 
 	dss2_32to16bit(abuf_dst,
 					&local_rw_array72_v101[0][0], 264);
@@ -744,19 +714,46 @@ static int dss2_2_sub_3B8790(int16_t *abuf_dst, int8_t *abuff_src) {
 
 }
 
-int main(void) {
-	int8_t *abuff_src;
-	int16_t *abuff_dst;
+static int dss_sp_decode_frame(AVCodecContext *avctx, void *data,
+                               int *got_frame_ptr, AVPacket *avpkt)
+{
+    DSS_SP_Context *p  = avctx->priv_data;
+    AVFrame *frame     = data;
+    const uint8_t *buf = avpkt->data;
+    int buf_size       = avpkt->size;
+
+    int16_t *out;
+    int ret;
+
+    if (buf_size < DSS_SP_FRAME_SIZE) {
+        if (buf_size)
+            av_log(avctx, AV_LOG_WARNING,
+                   "Expected %d bytes, got %d - skipping packet\n",
+                   DSS_SP_FRAME_SIZE, buf_size);
+        *got_frame_ptr = 0;
+        return buf_size;
+    }
+
+    frame->nb_samples = DSS_SP_SAMPLE_COUNT;
+    if ((ret = ff_get_buffer(avctx, frame, 0)) < 0) {
+         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
+         return ret;
+    }
+
+    out = (int16_t *)frame->data[0];
 
 
-	dss2_2_sub_3B8790(abuff_dst, abuff_src);
-	return 0;
+    /* process frame here */
+    dss2_2_sub_3B8790(p, out, buf);
+
+    *got_frame_ptr = 1;
+
+    return DSS_SP_FRAME_SIZE;
 }
 
 static const AVClass dss_sp_dec_class = {
     .class_name = "DSS SP decoder",
     .item_name  = av_default_item_name,
-    .option     = options,
     .version    = LIBAVUTIL_VERSION_INT,
 };
 
@@ -768,6 +765,5 @@ AVCodec ff_dss_sp_decoder = {
     .priv_data_size = sizeof(DSS_SP_Context),
     .init           = dss_sp_decode_init,
     .decode         = dss_sp_decode_frame,
-    .capabilities   = CODEC_CAP_SUBFRAMES,
     .priv_class     = &dss_sp_dec_class,
 };
