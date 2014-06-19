@@ -61,11 +61,12 @@ static av_cold int dss_sp_decode_init(AVCodecContext *avctx)
 }
 
 static void dss2_byte_swap(int8_t *abuff_swap, const int8_t *abuff_src) {
-	uint8_t *abuff_tmp;
+	const uint8_t *abuff_tmp;
 	int size; // si@1
 	int i;
 
 	abuff_tmp = abuff_src;
+
 	size = DSS_CBUF_SIZE;
 	if (flip) {
 		unsigned int tmp = abuff_tmp[0];
