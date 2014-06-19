@@ -21,7 +21,7 @@
 
 /**
  * @file
- * MTV demuxer.
+ *
  */
 
 #include "libavutil/bswap.h"
@@ -39,7 +39,7 @@
 #define DSS_TIME_SIZE                 12
 
 #define DSS_HEAD_OFFSET_ACODEC        0x2a4
-#define DSS_ACODEC_0                  0x0    /* SP mode */
+#define DSS_ACODEC_DSS_SP             0x0    /* SP mode */
 #define DSS_ACODEC_G723_1             0x2    /* LP mode */
 
 #define DSS_HEAD_OFFSET_COMMENT       0x31e
@@ -142,12 +142,11 @@ static int dss_read_header(AVFormatContext *s)
     avio_seek(pb, DSS_HEAD_OFFSET_ACODEC, SEEK_SET);
     priv->audio_codec = avio_r8(pb);
 
-    if (priv->audio_codec == DSS_ACODEC_0) {
-        printf("Not supported codec. DSS_ACODEC_0.\n");
-        return AVERROR(EINVAL);
-    } else if (priv->audio_codec == DSS_ACODEC_G723_1) {
+    if (priv->audio_codec == DSS_ACODEC_DSS_SP)
+        st->codec->codec_id       = AV_CODEC_ID_DSS_SP;
+    else if (priv->audio_codec == DSS_ACODEC_G723_1)
         st->codec->codec_id       = AV_CODEC_ID_G723_1;
-    } else {
+    else {
         printf("Not supported codec: %x.\n", priv->audio_codec);
         return AVERROR(EINVAL);
     }
@@ -193,7 +192,10 @@ static int dss_read_packet(AVFormatContext *s, AVPacket *pkt)
      * Don't forget to add offset.
      */
     byte     = avio_r8(s->pb);
-    size     = frame_size[byte & 3];
+    if (priv->audio_codec == DSS_ACODEC_G723_1)
+        size = frame_size[byte & 3];
+    else if (priv->audio_codec == DSS_ACODEC_DSS_SP)
+    	size = 41;
     priv->counter -= size;
 
     ret = av_new_packet(pkt, size);
