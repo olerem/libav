@@ -23,7 +23,6 @@
 
 unsigned int word_3D1266;
 
-unsigned int word_3D0C26;
 int dword_3D0498;
 unsigned int flip;
 int32_t g_unc_rw_array15_3D0420[15];
@@ -32,7 +31,6 @@ struct struc_6 g_unc_rw_array14_stg1_3D0D64;
 struct struc_8 g_unc_rw_array15_stg2_3D08C0;
 int16_t array14_3D0DA4[14];
 int32_t g_unc_rw_array72_3D0C44[72];
-int32_t g_unc_rw_arrayXX_3D08FC[186];
 int16_t word_3D9B7E;
 int dword_3D0DA0;
 struct struc_8 g_unc_rw_array15_3D0BE8;
@@ -42,15 +40,22 @@ int32_t g_unc_rw_array_3D04A0[264];
 typedef struct dss_sp_context {
     AVClass *class;
     int32_t g_unc_rw_array288_3D0DC0[288 + 6];
+    int32_t g_unc_rw_arrayXX_3D08FC[186];
+
+    unsigned int word_3D0C26;
 
 } DSS_SP_Context;
 
 static av_cold int dss_sp_decode_init(AVCodecContext *avctx)
 {
+    DSS_SP_Context *p = avctx->priv_data;
     avctx->channel_layout = AV_CH_LAYOUT_MONO;
     avctx->sample_fmt     = AV_SAMPLE_FMT_S16;
     avctx->channels       = 1;
     avctx->sample_rate    = 12000;
+
+    memset(p->g_unc_rw_arrayXX_3D08FC, 0, 0x2ECu);
+    p->word_3D0C26 = 1;
 
     return 0;
 }
@@ -96,7 +101,7 @@ static void dss2_byte_swap(int8_t *abuff_swap, const int8_t *abuff_src) {
 	}
 }
 
-static void dss2_unpack_coeffs(struct struc_1 *reconstr_abuff, int16_t *abuff_swap_a2) {
+static void dss2_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff, int16_t *abuff_swap_a2) {
 
 	int i;
 	int subframe_idx;
@@ -203,10 +208,10 @@ static void dss2_unpack_coeffs(struct struc_1 *reconstr_abuff, int16_t *abuff_sw
 		int index = 6;
 
 		if (combined_pulse_pos < C72_binomials[PULSE_MAX - 1]) {
-			if (word_3D0C26 != 0)
+			if (p->word_3D0C26 != 0)
 				goto LABEL_22;
 		} else
-				word_3D0C26 = 0;
+				p->word_3D0C26 = 0;
 
 		/* why do we need this? */
 		reconstr_abuff->sf[subframe_idx].pulse_pos[6] = 0;
@@ -231,7 +236,7 @@ static void dss2_unpack_coeffs(struct struc_1 *reconstr_abuff, int16_t *abuff_sw
 		};
 		////////////////////////////
 
-		if (word_3D0C26) {
+		if (p->word_3D0C26) {
 			int pulse, pulse_idx;
 			LABEL_22: pulse = PULSE_MAX - 1;
 			pulse_idx = 71; //GRID_SIZE
@@ -631,13 +636,6 @@ static void dss2_32to16bit(int16_t *dst, int32_t *src, int size) {
 		dst[i] = src[i];
 }
 
-#if 0
-static void dss2_clean_array_3B9060()
-{
-  memset(g_unc_rw_arrayXX_3D08FC, 0, 0x2ECu);
-}
-#endif
-
 static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t *abuff_src) {
 
 	struct struc_1 struc_1_v46; // [sp-C0h] [bp-61Ch]@12
@@ -652,15 +650,7 @@ static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t 
 
 	dss2_byte_swap(abuff_swap, abuff_src);
 
-#if 0
-	if (*dec_flag & 0x1) {
-		dss2_clean_array_3B9060();
-		*dec_flag &= ~0x1;
-		word_3D0C26 = 1;
-	}
-#endif
-
-	dss2_unpack_coeffs(&struc_1_v96, (int16_t *)abuff_swap);
+	dss2_unpack_coeffs(p, &struc_1_v96, (int16_t *)abuff_swap);
 
 	memcpy(&struc_1_v46, &struc_1_v96, 192u);
 	dss2_sub_3B8740(g_unc_rw_array14_stg1_3D0D64.array14_stage1, &struc_1_v46);
@@ -671,17 +661,17 @@ static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t 
 ////////
 	for (sf_idx = 0; sf_idx < SUBFRAMES; sf_idx++) {
 
-		dss2_sub_3B9080(g_unc_rw_array72_3D0C44, g_unc_rw_arrayXX_3D08FC,
+		dss2_sub_3B9080(g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC,
 				struc_1_v96.filed_1e,
 				g_unc_array_3C88F8[struc_1_v96.subframe_something[sf_idx]]);
 
 		dss2_add_pulses(g_unc_rw_array72_3D0C44, &struc_1_v96.sf[sf_idx]);
 
-		dss2_sub_3B9FB0(g_unc_rw_array72_3D0C44, g_unc_rw_arrayXX_3D08FC);
+		dss2_sub_3B9FB0(g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC);
 
 		/* swap and copy buffer */
 		for (i = 0; i < 72; i++)
-			g_unc_rw_array72_3D0C44[i] = g_unc_rw_arrayXX_3D08FC[71 - i];
+			g_unc_rw_array72_3D0C44[i] = p->g_unc_rw_arrayXX_3D08FC[71 - i];
 
 		/* TODO: find what happens with g_unc_rw_array15_3D0BE8 */
 		dss2_shift_sq_sub(g_unc_rw_array15_stg2_3D08C0.array14_stage2,
