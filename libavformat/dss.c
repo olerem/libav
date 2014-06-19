@@ -204,7 +204,11 @@ static int dss_read_packet(AVFormatContext *s, AVPacket *pkt)
 
     pkt->data[0]      = byte;
     offset = 1;
-    pkt->duration     = 240;
+    if (priv->audio_codec == DSS_ACODEC_G723_1)
+        pkt->duration = 240;
+    else if (priv->audio_codec == DSS_ACODEC_DSS_SP)
+        pkt->duration = 0;
+
     pkt->stream_index = 0;
 
     if (priv->counter < 0) {
