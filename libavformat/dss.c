@@ -48,6 +48,7 @@
 #define DSS_BLOCK_SIZE                512
 #define DSS_HEADER_SIZE               (DSS_BLOCK_SIZE * 2)
 #define DSS_AUDIO_BLOCK_HEADER_SIZE   6
+#define DSS_SP_FRAME_SIZE             42
 
 static const uint8_t frame_size[4] = { 24, 20, 4, 1 };
 
@@ -55,6 +56,8 @@ typedef struct DSSDemuxContext {
 
     unsigned int audio_codec;
     int counter;
+    int swap;
+    int dsssp_swap_byte;
 
 } DSSDemuxContext;
 
@@ -165,6 +168,7 @@ static int dss_read_header(AVFormatContext *s)
         return AVERROR(EIO);
 
     priv->counter = 0;
+    priv->swap = 0;
 
     return 0;
 
@@ -179,7 +183,82 @@ static void dss_skip_audio_header(AVFormatContext *s, AVPacket *pkt)
     priv->counter += DSS_BLOCK_SIZE - DSS_AUDIO_BLOCK_HEADER_SIZE;
 }
 
-static int dss_read_packet(AVFormatContext *s, AVPacket *pkt)
+static void dss_sp_byte_swap(DSSDemuxContext *priv,
+		int8_t *dst, const int8_t *src) {
+	int i;
+
+	if (priv->swap) {
+		for (i = 3; i < DSS_SP_FRAME_SIZE; i += 2)
+			dst[i] = src[i];
+
+		for (i = 0; i < DSS_SP_FRAME_SIZE; i += 2)
+			dst[i] = src[i + 4];
+
+		dst[1] = priv->dsssp_swap_byte;
+	} else {
+		memcpy(dst, src, DSS_SP_FRAME_SIZE);
+		priv->dsssp_swap_byte = src[DSS_SP_FRAME_SIZE - 1];
+	}
+
+	/* make sure byte 41 is always 0 */
+	dst[DSS_SP_FRAME_SIZE - 1] = 0;
+	priv->swap ^= 1;
+}
+
+static int dss_sp_read_packet(AVFormatContext *s, AVPacket *pkt)
+{
+    DSSDemuxContext *priv = s->priv_data;
+    int size, ret, offset = 0, buff_offset = 0;
+    int8_t buff[DSS_ACODEC_DSS_SP + 1];
+
+    if (priv->counter == 0)
+        dss_skip_audio_header(s, pkt);
+
+    pkt->pos = avio_tell(s->pb);
+
+
+    if (priv->audio_codec == DSS_ACODEC_DSS_SP) {
+    	size = priv->swap ? (DSS_SP_FRAME_SIZE - 2) : DSS_SP_FRAME_SIZE;
+    	buff_offset = 3;
+    }
+
+    priv->counter -= size;
+
+    ret = av_new_packet(pkt, DSS_SP_FRAME_SIZE);
+    if (ret < 0)
+        return ret;
+
+    pkt->duration = 0;
+    pkt->stream_index = 0;
+
+    if (priv->counter < 0) {
+        int size2 = priv->counter + size;
+
+        ret = avio_read(s->pb, buff + offset + buff_offset,
+            size2 - offset);
+        if (ret < size2 - offset) {
+            av_free_packet(pkt);
+            return ret < 0 ? ret : AVERROR_EOF;
+        }
+
+        dss_skip_audio_header(s, pkt);
+        offset = size2;
+    }
+
+    ret = avio_read(s->pb, buff + offset + buff_offset,
+    		size - offset);
+    if (ret < size - offset) {
+        av_free_packet(pkt);
+        return ret < 0 ? ret : AVERROR_EOF;
+    }
+
+    dss_sp_byte_swap(priv, pkt->data, buff);
+
+    return pkt->size;
+}
+
+
+static int dss_723_1_read_packet(AVFormatContext *s, AVPacket *pkt)
 {
     DSSDemuxContext *priv = s->priv_data;
     int size, byte, ret, offset;
@@ -192,10 +271,8 @@ static int dss_read_packet(AVFormatContext *s, AVPacket *pkt)
      * Don't forget to add offset.
      */
     byte     = avio_r8(s->pb);
-    if (priv->audio_codec == DSS_ACODEC_G723_1)
-        size = frame_size[byte & 3];
-    else if (priv->audio_codec == DSS_ACODEC_DSS_SP)
-    	size = 41;
+    size     = frame_size[byte & 3];
+
     priv->counter -= size;
 
     ret = av_new_packet(pkt, size);
@@ -204,10 +281,7 @@ static int dss_read_packet(AVFormatContext *s, AVPacket *pkt)
 
     pkt->data[0]      = byte;
     offset = 1;
-    if (priv->audio_codec == DSS_ACODEC_G723_1)
-        pkt->duration = 240;
-    else if (priv->audio_codec == DSS_ACODEC_DSS_SP)
-        pkt->duration = 0;
+    pkt->duration = 240;
 
     pkt->stream_index = 0;
 
@@ -232,6 +306,16 @@ static int dss_read_packet(AVFormatContext *s, AVPacket *pkt)
     }
 
     return pkt->size;
+}
+
+static int dss_read_packet(AVFormatContext *s, AVPacket *pkt)
+{
+    DSSDemuxContext *priv = s->priv_data;
+
+    if (priv->audio_codec == DSS_ACODEC_DSS_SP)
+    	return dss_sp_read_packet(s, pkt);
+    else
+    	return dss_723_1_read_packet(s, pkt);
 }
 
 AVInputFormat ff_dss_demuxer = {
