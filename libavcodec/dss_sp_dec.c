@@ -39,6 +39,8 @@ typedef struct dss_sp_context {
     AVClass *class;
     int32_t g_unc_rw_array288_3D0DC0[288 + 6];
     int32_t g_unc_rw_arrayXX_3D08FC[186];
+	struct struc_1 struc_1_v96;
+	int32_t local_rw_array72_v101[SUBFRAMES][72];
 
     unsigned int word_3D0C26;
 
@@ -58,7 +60,7 @@ static av_cold int dss_sp_decode_init(AVCodecContext *avctx)
     return 0;
 }
 
-static void dss2_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff, int16_t *abuff_swap_a2) {
+static void dss2_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff, const int16_t *abuff_swap_a2) {
 
 	int i;
 	int subframe_idx;
@@ -92,7 +94,7 @@ static void dss2_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff
 
 	// instead of "*((uint8_t *)abuff_swap_ptr + 11)" can be "(abuff_swap_ptr[5] >> 8) & 0xf"
 	reconstr_abuff->sf[0].combined_pulse_pos =
-			*((uint8_t *) abuff_swap_a2 + 11)
+			*((const uint8_t *) abuff_swap_a2 + 11)
 					+ ((abuff_swap_a2[4] + ((abuff_swap_a2[3] & 0x7F) << 16))
 							<< 8);
 	reconstr_abuff->sf[0].gain = (abuff_swap_a2[5] >> 2) & 0x3F;
@@ -219,10 +221,10 @@ static void dss2_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff
 /////////////////////////////////////////////////////////////////////////
 	v43 = abuff_swap_a2[19];
 
-	v46 = ((v43 << 8) + *((int8_t *) abuff_swap_a2 + 0x29)) / 151;
+	v46 = ((v43 << 8) + *((const int8_t *) abuff_swap_a2 + 0x29)) / 151;
 	// TODO, is filed_1e part of array_20?
 	reconstr_abuff->filed_1e =
-			((v43 << 8) + *((int8_t *) abuff_swap_a2 + 0x29)) % 151 + 36;
+			((v43 << 8) + *((const int8_t *) abuff_swap_a2 + 0x29)) % 151 + 36;
 	for (i = 0; i < 3; i++) {
 		int v47 = v46;
 		v46 /= 48;
@@ -595,22 +597,11 @@ static void dss2_32to16bit(int16_t *dst, int32_t *src, int size) {
 
 static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t *abuff_src) {
 
-	struct struc_1 struc_1_v46; // [sp-C0h] [bp-61Ch]@12
-
-	struct struc_1 struc_1_v96; // [sp+1Ch] [bp-540h]@5
-	int32_t local_rw_array72_v101[SUBFRAMES][72];
 	int i, tmp, sf_idx;
-	int8_t abuff_swap[42];
 
+	dss2_unpack_coeffs(p, &p->struc_1_v96, (const int16_t *)abuff_src);
 
-	//memcpy(&v50, &a6, 24u);
-
-	memcpy(abuff_swap, abuff_src, 42);
-
-	dss2_unpack_coeffs(p, &struc_1_v96, (int16_t *)abuff_swap);
-
-	memcpy(&struc_1_v46, &struc_1_v96, 192u);
-	dss2_sub_3B8740(g_unc_rw_array14_stg1_3D0D64.array14_stage1, &struc_1_v46);
+	dss2_sub_3B8740(g_unc_rw_array14_stg1_3D0D64.array14_stage1, &p->struc_1_v96);
 
 	dss2_sub_3B8410(&g_unc_rw_array14_stg1_3D0D64,
 			&g_unc_rw_array15_stg2_3D08C0);
@@ -619,10 +610,10 @@ static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t 
 	for (sf_idx = 0; sf_idx < SUBFRAMES; sf_idx++) {
 
 		dss2_sub_3B9080(g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC,
-				struc_1_v96.filed_1e,
-				g_unc_array_3C88F8[struc_1_v96.subframe_something[sf_idx]]);
+				p->struc_1_v96.filed_1e,
+				g_unc_array_3C88F8[p->struc_1_v96.subframe_something[sf_idx]]);
 
-		dss2_add_pulses(g_unc_rw_array72_3D0C44, &struc_1_v96.sf[sf_idx]);
+		dss2_add_pulses(g_unc_rw_array72_3D0C44, &p->struc_1_v96.sf[sf_idx]);
 
 		dss2_sub_3B9FB0(g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC);
 
@@ -647,16 +638,16 @@ static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t 
 
 		dss2_sub_3B80F0(g_unc_rw_array14_stg1_3D0D64.array14_stage1[0],
 				g_unc_rw_array15_stg2_3D08C0.array14_stage2, g_unc_rw_array72_3D0C44,
-				&local_rw_array72_v101[sf_idx][0], 72);
+				&p->local_rw_array72_v101[sf_idx][0], 72);
 
 	};
 ////////
 
-	dss2_sub_3B98D0(p, &local_rw_array72_v101[0][0]);
+	dss2_sub_3B98D0(p, &p->local_rw_array72_v101[0][0]);
 
 	dss2_32to16bit(abuf_dst,
-					&local_rw_array72_v101[0][0], 264);
-	memcpy(&array14_3D0DA4, struc_1_v96.array14_stage0, 28u);
+					&p->local_rw_array72_v101[0][0], 264);
+	memcpy(&array14_3D0DA4, p->struc_1_v96.array14_stage0, 28u);
 	return 0;
 
 }
