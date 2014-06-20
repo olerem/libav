@@ -23,8 +23,7 @@
 
 int dword_3D0498;
 unsigned int flip;
-int32_t g_unc_rw_array15_3D0420[15];
-int32_t g_unc_rw_array15_3D045C[15];
+
 struct struc_6 g_unc_rw_array14_stg1_3D0D64;
 struct struc_8 g_unc_rw_array15_stg2_3D08C0;
 int16_t array14_3D0DA4[14];
@@ -41,6 +40,8 @@ typedef struct dss_sp_context {
     int32_t g_unc_rw_arrayXX_3D08FC[186];
 	struct struc_1 struc_1_v96;
 	int32_t local_rw_array72_v101[SUBFRAMES][72];
+	int32_t g_unc_rw_array15_3D0420[15];
+	int32_t g_unc_rw_array15_3D045C[15];
 
     unsigned int word_3D0C26;
 
@@ -446,7 +447,7 @@ static int dss2_get_normalize_bits(int32_t *array_var, int16_t size) {
 	return max_val;
 }
 
-static void dss2_sub_3B80F0(int32_t a0, int32_t *array15_a1, int32_t *array72_a3,
+static void dss2_sub_3B80F0(DSS_SP_Context *p, int32_t a0, int32_t *array15_a1, int32_t *array72_a3,
 		int32_t *array72_a4, int size) {
 
 	int32_t local_rw_array15_v1a[15];
@@ -467,17 +468,17 @@ static void dss2_sub_3B80F0(int32_t a0, int32_t *array15_a1, int32_t *array72_a3
 	normalize_bits = dss2_get_normalize_bits(array72_a3, size);
 
 	dss2_normalize(array72_a3, normalize_bits - 3, size);
-	dss2_normalize(g_unc_rw_array15_3D0420, normalize_bits, 15);
-	dss2_normalize(g_unc_rw_array15_3D045C, normalize_bits, 15);
+	dss2_normalize(p->g_unc_rw_array15_3D0420, normalize_bits, 15);
+	dss2_normalize(p->g_unc_rw_array15_3D045C, normalize_bits, 15);
 
-	v36 = g_unc_rw_array15_3D045C[1];
+	v36 = p->g_unc_rw_array15_3D045C[1];
 
 	dss2_vec_mult(array15_a1, local_rw_array15_v39, g_unc_ro_array37_3C845C);
-	dss2_shift_sq_add(local_rw_array15_v39, g_unc_rw_array15_3D0420,
+	dss2_shift_sq_add(local_rw_array15_v39, p->g_unc_rw_array15_3D0420,
 			array72_a3);
 
 	dss2_vec_mult(array15_a1, local_rw_array15_v1a, g_unc_ro_array15_3C8420);
-	dss2_shift_sq_sub(local_rw_array15_v1a, g_unc_rw_array15_3D045C,
+	dss2_shift_sq_sub(local_rw_array15_v1a, p->g_unc_rw_array15_3D045C,
 			array72_a3);
 
 	/* a0 can be negative */
@@ -503,8 +504,8 @@ static void dss2_sub_3B80F0(int32_t a0, int32_t *array15_a1, int32_t *array72_a3
 		array72_a3[0] = (((tmp <= 0) - 1) & 0xFFFE) - 0x7FFF;
 
 	dss2_normalize(array72_a3, -normalize_bits, size);
-	dss2_normalize(g_unc_rw_array15_3D0420, -normalize_bits, 15);
-	dss2_normalize(g_unc_rw_array15_3D045C, -normalize_bits, 15);
+	dss2_normalize(p->g_unc_rw_array15_3D0420, -normalize_bits, 15);
+	dss2_normalize(p->g_unc_rw_array15_3D045C, -normalize_bits, 15);
 
 	v18 = 0;
 	if (size > 0)
@@ -636,7 +637,7 @@ static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t 
 			}
 		}
 
-		dss2_sub_3B80F0(g_unc_rw_array14_stg1_3D0D64.array14_stage1[0],
+		dss2_sub_3B80F0(p, g_unc_rw_array14_stg1_3D0D64.array14_stage1[0],
 				g_unc_rw_array15_stg2_3D08C0.array14_stage2, g_unc_rw_array72_3D0C44,
 				&p->local_rw_array72_v101[sf_idx][0], 72);
 
