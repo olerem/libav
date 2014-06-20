@@ -21,19 +21,6 @@
 #include <stdint.h>
 #include "dss_sp_dec_data.h"
 
-int dword_3D0498;
-unsigned int flip;
-
-struct struc_6 g_unc_rw_array14_stg1_3D0D64;
-struct struc_8 g_unc_rw_array15_stg2_3D08C0;
-int16_t array14_3D0DA4[14];
-int32_t g_unc_rw_array72_3D0C44[72];
-int16_t word_3D9B7E;
-int dword_3D0DA0;
-struct struc_8 g_unc_rw_array15_3D0BE8;
-
-int32_t g_unc_rw_array_3D04A0[264];
-
 typedef struct dss_sp_context {
     AVClass *class;
     int32_t g_unc_rw_array288_3D0DC0[288 + 6];
@@ -42,6 +29,13 @@ typedef struct dss_sp_context {
 	int32_t local_rw_array72_v101[SUBFRAMES][72];
 	int32_t g_unc_rw_array15_3D0420[15];
 	int32_t g_unc_rw_array15_3D045C[15];
+	struct struc_6 g_unc_rw_array14_stg1_3D0D64;
+	struct struc_8 g_unc_rw_array15_stg2_3D08C0;
+	int16_t array14_3D0DA4[14];
+	int32_t g_unc_rw_array72_3D0C44[72];
+	int dword_3D0498;
+	int dword_3D0DA0;
+	struct struc_8 g_unc_rw_array15_3D0BE8;
 
     unsigned int word_3D0C26;
 
@@ -518,7 +512,7 @@ static void dss2_sub_3B80F0(DSS_SP_Context *p, int32_t a0, int32_t *array15_a1, 
 		v22 = 1;
 
 	v23 = 409 * v22 >> 15 << 15;
-	tmp = (v23 + 32358 * dword_3D0498) >> 15;
+	tmp = (v23 + 32358 * p->dword_3D0498) >> 15;
 	local_rw_array_v41[0] = tmp;
 	tmp &= 0xFFFF8000;
 	if (tmp && tmp != 0xFFFF8000)
@@ -534,7 +528,7 @@ static void dss2_sub_3B80F0(DSS_SP_Context *p, int32_t a0, int32_t *array15_a1, 
 		}
 	}
 
-	dword_3D0498 = local_rw_array_v41[size];
+	p->dword_3D0498 = local_rw_array_v41[size];
 	if (size > 0) {
 		for (i = 0; i < size; i++) {
 			tmp = (array72_a3[i] * local_rw_array_v41[i]) >> 11;
@@ -602,43 +596,43 @@ static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t 
 
 	dss2_unpack_coeffs(p, &p->struc_1_v96, (const int16_t *)abuff_src);
 
-	dss2_sub_3B8740(g_unc_rw_array14_stg1_3D0D64.array14_stage1, &p->struc_1_v96);
+	dss2_sub_3B8740(p->g_unc_rw_array14_stg1_3D0D64.array14_stage1, &p->struc_1_v96);
 
-	dss2_sub_3B8410(&g_unc_rw_array14_stg1_3D0D64,
-			&g_unc_rw_array15_stg2_3D08C0);
+	dss2_sub_3B8410(&p->g_unc_rw_array14_stg1_3D0D64,
+			&p->g_unc_rw_array15_stg2_3D08C0);
 
 ////////
 	for (sf_idx = 0; sf_idx < SUBFRAMES; sf_idx++) {
 
-		dss2_sub_3B9080(g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC,
+		dss2_sub_3B9080(p->g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC,
 				p->struc_1_v96.filed_1e,
 				g_unc_array_3C88F8[p->struc_1_v96.subframe_something[sf_idx]]);
 
-		dss2_add_pulses(g_unc_rw_array72_3D0C44, &p->struc_1_v96.sf[sf_idx]);
+		dss2_add_pulses(p->g_unc_rw_array72_3D0C44, &p->struc_1_v96.sf[sf_idx]);
 
-		dss2_sub_3B9FB0(g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC);
+		dss2_sub_3B9FB0(p->g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC);
 
 		/* swap and copy buffer */
 		for (i = 0; i < 72; i++)
-			g_unc_rw_array72_3D0C44[i] = p->g_unc_rw_arrayXX_3D08FC[71 - i];
+			p->g_unc_rw_array72_3D0C44[i] = p->g_unc_rw_arrayXX_3D08FC[71 - i];
 
 		/* TODO: find what happens with g_unc_rw_array15_3D0BE8 */
-		dss2_shift_sq_sub(g_unc_rw_array15_stg2_3D08C0.array14_stage2,
-				g_unc_rw_array15_3D0BE8.array14_stage2, g_unc_rw_array72_3D0C44);
+		dss2_shift_sq_sub(p->g_unc_rw_array15_stg2_3D08C0.array14_stage2,
+				p->g_unc_rw_array15_3D0BE8.array14_stage2, p->g_unc_rw_array72_3D0C44);
 
 		for (i = 0; i < 72; i++) {
-			tmp = (((dword_3D0DA0 << 13) - dword_3D0DA0)
-					+ (g_unc_rw_array72_3D0C44[i] << 15) + 0x4000) >> 15;
-			g_unc_rw_array72_3D0C44[i] = tmp;
+			tmp = (((p->dword_3D0DA0 << 13) - p->dword_3D0DA0)
+					+ (p->g_unc_rw_array72_3D0C44[i] << 15) + 0x4000) >> 15;
+			p->g_unc_rw_array72_3D0C44[i] = tmp;
 			tmp &= 0xFFFF8000;
 			if (tmp && tmp != 0xFFFF8000) {
-				dword_3D0DA0 = (((tmp <= 0) - 1) & 0xFFFE) - 0x7FFF;
-				g_unc_rw_array72_3D0C44[i] = dword_3D0DA0;
+				p->dword_3D0DA0 = (((tmp <= 0) - 1) & 0xFFFE) - 0x7FFF;
+				p->g_unc_rw_array72_3D0C44[i] = p->dword_3D0DA0;
 			}
 		}
 
-		dss2_sub_3B80F0(p, g_unc_rw_array14_stg1_3D0D64.array14_stage1[0],
-				g_unc_rw_array15_stg2_3D08C0.array14_stage2, g_unc_rw_array72_3D0C44,
+		dss2_sub_3B80F0(p, p->g_unc_rw_array14_stg1_3D0D64.array14_stage1[0],
+				p->g_unc_rw_array15_stg2_3D08C0.array14_stage2, p->g_unc_rw_array72_3D0C44,
 				&p->local_rw_array72_v101[sf_idx][0], 72);
 
 	};
@@ -648,7 +642,7 @@ static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t 
 
 	dss2_32to16bit(abuf_dst,
 					&p->local_rw_array72_v101[0][0], 264);
-	memcpy(&array14_3D0DA4, p->struc_1_v96.array14_stage0, 28u);
+	memcpy(&p->array14_3D0DA4, p->struc_1_v96.array14_stage0, 28u);
 	return 0;
 
 }
