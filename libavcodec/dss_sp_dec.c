@@ -21,8 +21,6 @@
 #include <stdint.h>
 #include "dss_sp_dec_data.h"
 
-unsigned int word_3D1266;
-
 int dword_3D0498;
 unsigned int flip;
 int32_t g_unc_rw_array15_3D0420[15];
@@ -58,48 +56,6 @@ static av_cold int dss_sp_decode_init(AVCodecContext *avctx)
     p->word_3D0C26 = 1;
 
     return 0;
-}
-
-static void dss2_byte_swap(int8_t *abuff_swap, const int8_t *abuff_src) {
-	const uint8_t *abuff_tmp;
-	int size; // si@1
-	int i;
-
-	abuff_tmp = abuff_src;
-
-	size = DSS_CBUF_SIZE;
-	if (flip) {
-		unsigned int tmp = abuff_tmp[0];
-		abuff_tmp++;
-
-		for (i = 0; i < size - 1; i++) {
-			abuff_swap[0] = tmp;
-			abuff_swap[1] = abuff_tmp[0];
-			tmp = abuff_tmp[1];
-			abuff_tmp += 2;
-			abuff_swap += 2;
-		}
-
-		word_3D1266 = tmp;
-		abuff_swap[0] = 0;
-		abuff_swap[1] = abuff_tmp[0];
-		flip ^= 1;
-	} else {
-		abuff_swap[0] = abuff_tmp[2];
-		abuff_swap[1] = word_3D1266;
-		abuff_tmp++;
-		abuff_swap += 2;
-
-		for (i = 0; i < size - 2; i++) {
-			abuff_swap[0] = abuff_tmp[3];
-			abuff_swap[1] = abuff_tmp[0];
-			abuff_swap += 2;
-			abuff_tmp += 2;
-		}
-
-		abuff_swap[1] = abuff_tmp[0];
-		flip ^= 1;
-	}
 }
 
 static void dss2_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff, int16_t *abuff_swap_a2) {
@@ -649,7 +605,7 @@ static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t 
 
 	//memcpy(&v50, &a6, 24u);
 
-	dss2_byte_swap(abuff_swap, abuff_src);
+	memcpy(abuff_swap, abuff_src, 42);
 
 	dss2_unpack_coeffs(p, &struc_1_v96, (int16_t *)abuff_swap);
 
