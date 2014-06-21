@@ -87,11 +87,11 @@ static void dss2_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff
 
 	reconstr_abuff->subframe_something[0] = (abuff_swap_a2[3] >> 7) & 0x1F;
 
-	// instead of "*((uint8_t *)abuff_swap_ptr + 11)" can be "(abuff_swap_ptr[5] >> 8) & 0xf"
 	reconstr_abuff->sf[0].combined_pulse_pos =
-			*((const uint8_t *) abuff_swap_a2 + 11)
-					+ ((abuff_swap_a2[4] + ((abuff_swap_a2[3] & 0x7F) << 16))
-							<< 8);
+			  (abuff_swap_a2[5] & 0xff00) >> 8
+			| (abuff_swap_a2[4] & 0xffff) << 8
+			| (abuff_swap_a2[3] & 0x7f) << 24;
+
 	reconstr_abuff->sf[0].gain = (abuff_swap_a2[5] >> 2) & 0x3F;
 
 	reconstr_abuff->sf[0].pulse_val[0] = ((abuff_swap_a2[6] >> 15) & 1)
@@ -105,8 +105,11 @@ static void dss2_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff
 
 	reconstr_abuff->subframe_something[1] = (abuff_swap_a2[7] >> 8) & 0x1F;
 
-	reconstr_abuff->sf[1].combined_pulse_pos = ((abuff_swap_a2[9] >> 9) & 0x7F)
-			+ ((abuff_swap_a2[8] + (abuff_swap_a2[7] << 16)) << 7);
+	reconstr_abuff->sf[1].combined_pulse_pos =
+			  (abuff_swap_a2[9] & 0xfe00) >> 9
+			| (abuff_swap_a2[8] & 0xffff) << 7
+			| (abuff_swap_a2[7] & 0xff) << 23;
+
 	reconstr_abuff->sf[1].gain = (abuff_swap_a2[9] >> 3) & 0x3F;
 
 	reconstr_abuff->sf[1].pulse_val[0] = abuff_swap_a2[9] & 7;
@@ -121,9 +124,9 @@ static void dss2_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff
 	reconstr_abuff->subframe_something[2] = (abuff_swap_a2[11] >> 9) & 0x1F;
 
 	reconstr_abuff->sf[2].combined_pulse_pos =
-			((abuff_swap_a2[13] >> 10) & 0x3F)
-					+ ((abuff_swap_a2[12]
-							+ ((abuff_swap_a2[11] & 0x1FF) << 16)) << 6);
+			  (abuff_swap_a2[13] & 0xfc00) >> 10
+			| (abuff_swap_a2[12] & 0xffff) << 6
+			| (abuff_swap_a2[11] & 0x1ff) << 22;
 
 	reconstr_abuff->sf[2].gain = (abuff_swap_a2[13] >> 4) & 0x3F;
 
@@ -139,9 +142,11 @@ static void dss2_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff
 
 	reconstr_abuff->subframe_something[3] = (abuff_swap_a2[15] >> 10) & 0x1F;
 
-	reconstr_abuff->sf[3].combined_pulse_pos = ((abuff_swap_a2[17] >> 11)
-			& 0x1F)
-			+ 32 * (abuff_swap_a2[16] + ((abuff_swap_a2[15] & 0x3FF) << 16));
+	reconstr_abuff->sf[3].combined_pulse_pos =
+			  (abuff_swap_a2[17] & 0xf800) >> 11
+			| (abuff_swap_a2[16] & 0xffff) << 5
+			| (abuff_swap_a2[15] & 0x3ff) << 21;
+
 	reconstr_abuff->sf[3].gain = (abuff_swap_a2[17] >> 5) & 0x3F;
 
 	reconstr_abuff->sf[3].pulse_val[0] = (abuff_swap_a2[17] >> 2) & 7;
