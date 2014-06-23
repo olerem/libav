@@ -268,7 +268,7 @@ static void dss2_sub_3B8410(struct struc_6 *struc_6_a1,
 	int tmp;
 
 	v3 = 0;
-	struc_6_stg2_a2->array14_stage2[0] = 0x2000u;
+	struc_6_stg2_a2->field_0 = 0x2000;
 	while (1) {
 		v5 = v3;
 		v6 = v3 + 1;
