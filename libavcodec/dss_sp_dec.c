@@ -363,33 +363,33 @@ static void dss2_sub_3B9FB0(int32_t *array72, int32_t *arrayXX) {
 		arrayXX[72 - i] = array72[i];
 }
 
-static void dss2_shift_sq_sub(const int32_t *array_a1, int32_t *array_a2,
-		int32_t *array_a3_dst) {
+static void dss2_shift_sq_sub(const int32_t *array_a1, int32_t a1_filed_0,
+		int32_t *array_a2, int32_t *array_a3_dst) {
 	int a;
 
 	for (a = 0; a < 72; a++) {
 		int i, tmp;
 
-		tmp = array_a3_dst[a] * array_a1[0];
+		tmp = array_a3_dst[a] * a1_filed_0;
 
-		for (i = 14; i > 0; i--)
+		for (i = 13; i >= 0; i--)
 			tmp -= array_a2[i] * array_a1[i];
 
 		/* original code overwrite array_a2[1] two times - makes no sense for me. */
-		for (i = 14; i > 1; i--)
+		for (i = 13; i >= 0; i--)
 			array_a2[i] = array_a2[i - 1];
 
 		tmp = (tmp + 4096) >> 13;
 
-		array_a2[1] = tmp;
+		array_a2[0] = tmp;
 
 		array_a3_dst[a] = tmp;
 		tmp &= 0xFFFF8000;
 		if (tmp && tmp != 0xFFFF8000) {
 			if (tmp <= 0)
-				array_a2[1] = array_a3_dst[a] = 0xFFFF8000;
+				array_a2[0] = array_a3_dst[a] = 0xFFFF8000;
 			else
-				array_a2[1] = array_a3_dst[a] = 0x7FFF;
+				array_a2[0] = array_a3_dst[a] = 0x7FFF;
 		}
 	}
 }
@@ -477,8 +477,8 @@ static void dss2_sub_3B80F0(DSS_SP_Context *p, int32_t a0, int32_t *array15_a1, 
 			array72_a3);
 
 	dss2_vec_mult(array15_a1, local_rw_array15_v1a, g_unc_ro_array15_3C8420);
-	dss2_shift_sq_sub(local_rw_array15_v1a, p->g_unc_rw_array15_3D045C,
-			array72_a3);
+	dss2_shift_sq_sub(local_rw_array15_v1a, local_rw_array15_v1a[0],
+			p->g_unc_rw_array15_3D045C, array72_a3);
 
 	/* a0 can be negative */
 	v11 = a0 >> 1;
@@ -619,10 +619,10 @@ static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t 
 
 		/* swap and copy buffer */
 		for (i = 0; i < 72; i++)
-			p->g_unc_rw_array72_3D0C44[i] = p->g_unc_rw_arrayXX_3D08FC[71 - i];
+			p->g_unc_rw_array72_3D0C44[i] = p->g_unc_rw_arrayXX_3D08FC[72 - i];
 
-		/* TODO: find what happens with g_unc_rw_array15_3D0BE8 */
 		dss2_shift_sq_sub(p->g_unc_rw_array15_stg2_3D08C0.array14_stage2,
+				p->g_unc_rw_array15_stg2_3D08C0.field_0,
 				p->g_unc_rw_array15_3D0BE8.array14_stage2, p->g_unc_rw_array72_3D0C44);
 
 		for (i = 0; i < 72; i++) {
