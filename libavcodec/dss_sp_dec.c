@@ -30,12 +30,12 @@ typedef struct dss_sp_context {
 	int32_t g_unc_rw_array15_3D0420[15];
 	int32_t g_unc_rw_array15_3D045C[15];
 	struct struc_6 g_unc_rw_array14_stg1_3D0D64;
-	struct struc_8 g_unc_rw_array15_stg2_3D08C0;
+	int32_t g_unc_rw_array15_stg2_3D08C0[15];
 	int16_t array14_3D0DA4[14];
 	int32_t g_unc_rw_array72_3D0C44[72];
 	int dword_3D0498;
 	int dword_3D0DA0;
-	struct struc_8 g_unc_rw_array15_3D0BE8;
+	int32_t g_unc_rw_array15_3D0BE8[15];
 
     unsigned int word_3D0C26;
 
@@ -256,7 +256,7 @@ static void dss2_sub_3B8740(int32_t *array14_stage1, const struct struc_1 *a2) {
 }
 
 static void dss2_sub_3B8410(struct struc_6 *struc_6_a1,
-		struct struc_8 *struc_6_stg2_a2) {
+		int32_t *struc_6_stg2_a2) {
 	int v3; // esi@1
 	int v5; // ebx@2
 	signed int v6; // eax@2
@@ -268,11 +268,11 @@ static void dss2_sub_3B8410(struct struc_6 *struc_6_a1,
 	int tmp;
 
 	v3 = 0;
-	struc_6_stg2_a2->field_0 = 0x2000;
+	struc_6_stg2_a2[0] = 0x2000;
 	while (1) {
 		v5 = v3;
 		v6 = v3 + 1;
-		struc_6_stg2_a2->array14_stage2[v3] = struc_6_a1->array14_stage1[v3] >> 2;
+		struc_6_stg2_a2[v3 + 1] = struc_6_a1->array14_stage1[v3] >> 2;
 		if (v6 / 2 >= 1)
 			break;
 		LABEL_9: ++v3;
@@ -283,18 +283,18 @@ static void dss2_sub_3B8410(struct struc_6 *struc_6_a1,
 	/////////////////////////////
 	counter = 1;
 	while (1) {
-		v7 = struc_6_stg2_a2->array14_stage2[counter - 1];
+		v7 = struc_6_stg2_a2[counter];
 		// 4, 4, 4
-		v8 = struc_6_stg2_a2->array14_stage2[v5 - counter];
+		v8 = struc_6_stg2_a2[1 + v5 - counter];
 		// 8, 8, c
 		tmp = (struc_6_a1->array14_stage1[v5] * v8 + (v7 << 15) + 0x4000) >> 15;
-		struc_6_stg2_a2->array14_stage2[counter - 1] = tmp;
+		struc_6_stg2_a2[counter] = tmp;
 		tmp &= 0xFFFF8000;
 		if (tmp && tmp != 0xFFFF8000)
 			break;
 
 		tmp = (struc_6_a1->array14_stage1[v5] * v7 + (v8 << 15) + 0x4000) >> 15;
-		struc_6_stg2_a2->array14_stage2[v5 - counter] = tmp;
+		struc_6_stg2_a2[1 + v5 - counter] = tmp;
 		tmp &= 0xFFFF8000;
 		if (tmp && tmp != 0xFFFF8000)
 			break;
@@ -363,33 +363,33 @@ static void dss2_sub_3B9FB0(int32_t *array72, int32_t *arrayXX) {
 		arrayXX[72 - i] = array72[i];
 }
 
-static void dss2_shift_sq_sub(const int32_t *array_a1, int32_t a1_filed_0,
+static void dss2_shift_sq_sub(const int32_t *array_a1,
 		int32_t *array_a2, int32_t *array_a3_dst) {
 	int a;
 
 	for (a = 0; a < 72; a++) {
 		int i, tmp;
 
-		tmp = array_a3_dst[a] * a1_filed_0;
+		tmp = array_a3_dst[a] * array_a1[0];
 
-		for (i = 13; i >= 0; i--)
+		for (i = 14; i > 0; i--)
 			tmp -= array_a2[i] * array_a1[i];
 
 		/* original code overwrite array_a2[1] two times - makes no sense for me. */
-		for (i = 13; i >= 0; i--)
+		for (i = 14; i > 0; i--)
 			array_a2[i] = array_a2[i - 1];
 
 		tmp = (tmp + 4096) >> 13;
 
-		array_a2[0] = tmp;
+		array_a2[1] = tmp;
 
 		array_a3_dst[a] = tmp;
 		tmp &= 0xFFFF8000;
 		if (tmp && tmp != 0xFFFF8000) {
 			if (tmp <= 0)
-				array_a2[0] = array_a3_dst[a] = 0xFFFF8000;
+				array_a2[1] = array_a3_dst[a] = 0xFFFF8000;
 			else
-				array_a2[0] = array_a3_dst[a] = 0x7FFF;
+				array_a2[1] = array_a3_dst[a] = 0x7FFF;
 		}
 	}
 }
@@ -425,7 +425,7 @@ static void dss2_vec_mult(const int32_t *array15_ro_src, int32_t *array15_dst,
 	array15_dst[0] = array15_ro_src[0];
 
 	/* TODO: pseudocode and my result are too different. May be my version is wrong */
-	for (i = 1; i < 14; i++)
+	for (i = 1; i < 15; i++)
 		array15_dst[i] = (array15_ro_src[i] * array15_ro_a3[i] + 0x4000) >> 15;
 }
 
@@ -477,7 +477,7 @@ static void dss2_sub_3B80F0(DSS_SP_Context *p, int32_t a0, int32_t *array15_a1, 
 			array72_a3);
 
 	dss2_vec_mult(array15_a1, local_rw_array15_v1a, g_unc_ro_array15_3C8420);
-	dss2_shift_sq_sub(local_rw_array15_v1a, local_rw_array15_v1a[0],
+	dss2_shift_sq_sub(local_rw_array15_v1a,
 			p->g_unc_rw_array15_3D045C, array72_a3);
 
 	/* a0 can be negative */
@@ -604,7 +604,7 @@ static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t 
 	dss2_sub_3B8740(p->g_unc_rw_array14_stg1_3D0D64.array14_stage1, &p->struc_1_v96);
 
 	dss2_sub_3B8410(&p->g_unc_rw_array14_stg1_3D0D64,
-			&p->g_unc_rw_array15_stg2_3D08C0);
+			p->g_unc_rw_array15_stg2_3D08C0);
 
 ////////
 	for (sf_idx = 0; sf_idx < SUBFRAMES; sf_idx++) {
@@ -621,9 +621,8 @@ static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t 
 		for (i = 0; i < 72; i++)
 			p->g_unc_rw_array72_3D0C44[i] = p->g_unc_rw_arrayXX_3D08FC[72 - i];
 
-		dss2_shift_sq_sub(p->g_unc_rw_array15_stg2_3D08C0.array14_stage2,
-				p->g_unc_rw_array15_stg2_3D08C0.field_0,
-				p->g_unc_rw_array15_3D0BE8.array14_stage2, p->g_unc_rw_array72_3D0C44);
+		dss2_shift_sq_sub(p->g_unc_rw_array15_stg2_3D08C0,
+				p->g_unc_rw_array15_3D0BE8, p->g_unc_rw_array72_3D0C44);
 
 		for (i = 0; i < 72; i++) {
 			tmp = (((p->dword_3D0DA0 << 13) - p->dword_3D0DA0)
@@ -637,7 +636,7 @@ static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t 
 		}
 
 		dss2_sub_3B80F0(p, p->g_unc_rw_array14_stg1_3D0D64.array14_stage1[0],
-				p->g_unc_rw_array15_stg2_3D08C0.array14_stage2, p->g_unc_rw_array72_3D0C44,
+				p->g_unc_rw_array15_stg2_3D08C0, p->g_unc_rw_array72_3D0C44,
 				&p->local_rw_array72_v101[sf_idx][0], 72);
 
 	};
