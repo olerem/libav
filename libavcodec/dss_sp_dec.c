@@ -451,7 +451,7 @@ static void dss2_sub_3B80F0(DSS_SP_Context *p, int32_t a0, int32_t *array15_a1, 
 
 	int32_t local_rw_array15_v1a[15];
 	int32_t local_rw_array15_v39[15];
-	int32_t local_rw_array_v41[73];
+	int32_t local_rw_array_v41[72];
 	int v11, v22, v23, v18, v34, v36, normalize_bits;
 	int i, tmp;
 
@@ -524,7 +524,7 @@ static void dss2_sub_3B80F0(DSS_SP_Context *p, int32_t a0, int32_t *array15_a1, 
 		local_rw_array_v41[0] = (((tmp <= 0) - 1) & 0xFFFE) - 0x7FFF;
 
 	if (size > 1) {
-		for (i = 1; i < size - 1; i++) {
+		for (i = 1; i < size; i++) {
 			tmp = (v23 + 32358 * local_rw_array_v41[i - 1]) >> 15;
 			local_rw_array_v41[i] = tmp;
 			tmp &= 0xFFFF8000;
@@ -533,7 +533,7 @@ static void dss2_sub_3B80F0(DSS_SP_Context *p, int32_t a0, int32_t *array15_a1, 
 		}
 	}
 
-	p->dword_3D0498 = local_rw_array_v41[size];
+	p->dword_3D0498 = local_rw_array_v41[size - 1];
 	if (size > 0) {
 		for (i = 0; i < size; i++) {
 			tmp = (array72_a3[i] * local_rw_array_v41[i]) >> 11;
