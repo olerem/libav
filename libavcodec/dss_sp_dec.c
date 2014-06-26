@@ -59,10 +59,10 @@ static void dss2_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff
 
 	int i;
 	int subframe_idx;
-	int16_t v43;
+	uint32_t v43;
 	int v46;
-	int16_t v51;
-	int16_t v48;
+	uint32_t v51;
+	uint32_t v48;
 
 	reconstr_abuff->array14_stage0[0] = (abuff_swap_a2[0] >> 11) & 0x1F;
 	reconstr_abuff->array14_stage0[1] = (abuff_swap_a2[0] >> 6) & 0x1F;
@@ -219,12 +219,14 @@ static void dss2_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff
 	}
 
 /////////////////////////////////////////////////////////////////////////
-	v43 = abuff_swap_a2[19];
+	v43 = (abuff_swap_a2[19] & 0xffff) << 8;
 
-	v46 = ((v43 << 8) + *((const int8_t *) abuff_swap_a2 + 0x29)) / 151;
+	v46 = (v43 | ((abuff_swap_a2[20] & 0xff00) >> 8)) / 151;
+
+
 	// TODO, is filed_1e part of array_20?
 	reconstr_abuff->filed_1e =
-			((v43 << 8) + *((const int8_t *) abuff_swap_a2 + 0x29)) % 151 + 36;
+			(v43 | ((abuff_swap_a2[20] & 0xff00) >> 8)) % 151 + 36;
 	for (i = 0; i < 3; i++) {
 		int v47 = v46;
 		v46 /= 48;
