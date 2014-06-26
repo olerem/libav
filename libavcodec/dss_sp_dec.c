@@ -223,18 +223,16 @@ static void dss2_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff
 
 	v46 = (v43 | ((abuff_swap_a2[20] & 0xff00) >> 8)) / 151;
 
-
-	// TODO, is filed_1e part of array_20?
-	reconstr_abuff->filed_1e =
+	reconstr_abuff->array_20[0] =
 			(v43 | ((abuff_swap_a2[20] & 0xff00) >> 8)) % 151 + 36;
-	for (i = 0; i < 3; i++) {
+	for (i = 1; i < SUBFRAMES; i++) {
 		int v47 = v46;
 		v46 /= 48;
 		reconstr_abuff->array_20[i] = v47 - 48 * v46;
 	}
 ////////////////////////////////////////////////////////////////////////
-	v48 = reconstr_abuff->filed_1e;
-	for (i = 0; i < 3; i++) {
+	v48 = reconstr_abuff->array_20[0];
+	for (i = 1; i < SUBFRAMES; i++) {
 		if (v48 > 162) {
 			reconstr_abuff->array_20[i] += 139;
 		} else {
@@ -612,7 +610,7 @@ static int dss2_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t 
 	for (sf_idx = 0; sf_idx < SUBFRAMES; sf_idx++) {
 
 		dss2_sub_3B9080(p->g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC,
-				p->struc_1_v96.filed_1e,
+				p->struc_1_v96.array_20[sf_idx],
 				g_unc_array_3C88F8[p->struc_1_v96.subframe_something[sf_idx]]);
 
 		dss2_add_pulses(p->g_unc_rw_array72_3D0C44, &p->struc_1_v96.sf[sf_idx]);

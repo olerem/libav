@@ -27,8 +27,7 @@ struct struc_1 {
 	int16_t	array14_stage0[14];
 
 	int16_t subframe_something[SUBFRAMES];
-	int16_t filed_1e;
-	int16_t array_20[3];
+	int16_t array_20[SUBFRAMES];
 
 	struct dss2_subframe sf[SUBFRAMES];
 };
