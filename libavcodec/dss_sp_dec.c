@@ -24,7 +24,7 @@
 typedef struct dss_sp_context {
     AVClass *class;
     int32_t g_unc_rw_array288_3D0DC0[288 + 6];
-    int32_t g_unc_rw_arrayXX_3D08FC[186];
+    int32_t g_unc_rw_arrayXX_3D08FC[187];
 	struct struc_1 struc_1_v96;
 	int32_t local_rw_array72_v101[SUBFRAMES][72];
 	int32_t g_unc_rw_array15_3D0420[15];
@@ -356,8 +356,8 @@ static void dss2_normalize(int32_t *array_a1, int normalize_bits, int array_a1_s
 static void dss2_sub_3B9FB0(int32_t *array72, int32_t *arrayXX) {
 	int i;
 
-	for (i = 0; i < 114; i++)
-		arrayXX[114 - i] = arrayXX[186 - i];
+	for (i = 114; i > 0; i--)
+		arrayXX[i + 72] = arrayXX[i];
 
 	for (i = 0; i < 72; i++)
 		arrayXX[72 - i] = array72[i];
@@ -551,18 +551,19 @@ static void dss2_sub_3B98D0(DSS_SP_Context *p, int32_t *array72_a1) {
 	signed int v10;
 
 	int v12;
-	int i, offset, counter;
+	int i, offset, counter, array_size;
 
 	v1 = 0;
 
 	for (i = 0; i < 6; i++)
 		p->g_unc_rw_array288_3D0DC0[i] = p->g_unc_rw_array288_3D0DC0[288 + i];
 
-	for (i = 0; i < 72; i++)
+	for (i = 0; i < 72 * SUBFRAMES; i++)
 		p->g_unc_rw_array288_3D0DC0[6 + i] = array72_a1[i];
 
 	offset = 6;
 	counter = 0;
+	array_size = sizeof(p->g_unc_rw_array288_3D0DC0) / sizeof(int32_t);
 	do {
 		v10 = 0;
 		for (i = 0; i < 6; i++)
@@ -582,7 +583,7 @@ static void dss2_sub_3B98D0(DSS_SP_Context *p, int32_t *array72_a1) {
 		v1 = (v1 + 1) % 11;
 		if (!v1)
 			offset++;
-	} while (offset < sizeof(p->g_unc_rw_array288_3D0DC0) / sizeof(int32_t));
+	} while (offset < array_size);
 }
 
 static void dss2_32to16bit(int16_t *dst, int32_t *src, int size) {
