@@ -503,7 +503,7 @@ static int dss_sp_get_normalize_bits(int32_t *array_var, int16_t size) {
 	return max_val;
 }
 
-static void dss_sp_sub_3B80F0(DSS_SP_Context *p, int32_t a0,
+static void dss_sp_sf_synthesis(DSS_SP_Context *p, int32_t a0,
 		int32_t *array72_a4, int size) {
 
 	int32_t local_rw_array15_v1a[15];
@@ -695,7 +695,7 @@ static int dss_sp_decode_frame_2(DSS_SP_Context *p, int16_t *abuf_dst, const int
 			}
 		}
 
-		dss_sp_sub_3B80F0(p, p->g_unc_rw_array14_stg1_3D0D64.array14_stage1[0],
+		dss_sp_sf_synthesis(p, p->g_unc_rw_array14_stg1_3D0D64.array14_stage1[0],
 				&p->working_buffer[sf_idx][0], 72);
 
 	};
