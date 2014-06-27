@@ -14,36 +14,6 @@
 #define DSS_SP_FRAME_SIZE 42
 #define DSS_SP_SAMPLE_COUNT (66 * SUBFRAMES)
 
-struct dss_sp_subframe {
-	int16_t gain;
-	int16_t field_2;
-	int32_t combined_pulse_pos;
-	int16_t pulse_pos[7]; /* this values was calculate */
-	int16_t pulse_val[7]; /* this values was get directly from decompressor */
-};
-
-struct dss_sp_frameparam {
-	int16_t	field_0;
-	int16_t	codebook_indices[14];
-
-	int16_t subframe_something[SUBFRAMES];
-	int16_t array_20[SUBFRAMES];
-
-	struct dss_sp_subframe sf[SUBFRAMES];
-};
-
-struct struc_6 {
-	int32_t array14_stage1[14];
-	int32_t field_38;
-};
-
-struct struc_8 {
-	int32_t field_0;
-	int32_t array14_stage2[14]; // generally it is array14,
-	// first field is used for some thing else and should be moved to filed_0
-	int32_t field_38;
-};
-
 /*
  * Comment from: ./libavcodec/g723_1_data.h
  * Used for the coding/decoding of the pulses positions
@@ -148,7 +118,7 @@ static const uint32_t dss_sp_combinatorial_table[PULSE_MAX][72] = {
     778789440, 869648208, 969443904, 1078897248, 1198774720, 1329890705 },
 };
 
-static const int16_t g_unc_array_3C84F0[14][32] = {
+static const int16_t dss_sp_filter_cb[14][32] = {
     { -32653, -32587, -32515, -32438, -32341, -32216, -32062, -31881,
       -31665, -31398, -31080, -30724, -30299, -29813, -29248, -28572,
       -27674, -26439, -24666, -22466, -19433, -16133, -12218,  -7783,
@@ -249,7 +219,7 @@ static const int32_t dss_sp_unc_decreasing_array[] = {
 		5498, 4398, 3518, 2815, 2252, 1801, 1441,
 };
 
-static const int16_t g_unc_array_3C88F8[] = {
+static const int16_t dss_sp_adaptive_gain[] = {
 		 102,  231,  360,  488,  617,  746,  875, 1004,
 		1133, 1261, 1390, 1519, 1648, 1777, 1905, 2034,
 		2163, 2292, 2421, 2550, 2678, 2807, 2936, 3065,
@@ -261,7 +231,7 @@ static const int16_t g_unc_array_3C8938[] = {
 		20, 22, 24, 26, 28, 30, 34, 40, 46, 52, 60, 72, 84,
 };
 
-static const int32_t g_unc_array_3C9288[67] = {
+static const int32_t dss_sp_sinc[67] = {
 		  262,   293,   323,   348,   356,   336,   269,   139,
 		  -67,  -358,  -733, -1178, -1668, -2162, -2607, -2940,
 		-3090, -2986, -2562, -1760,  -541,  1110,  3187,  5651,
