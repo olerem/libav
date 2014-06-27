@@ -54,7 +54,7 @@ static av_cold int dss_sp_decode_init(AVCodecContext *avctx)
     return 0;
 }
 
-static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct dss_sp_frameparam *reconstr_abuff, const int16_t *compressed_buf) {
+static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct dss_sp_frameparam *fparam, const int16_t *compressed_buf) {
 
 	int i;
 	int subframe_idx;
@@ -63,106 +63,106 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct dss_sp_frameparam *re
 	uint32_t v51;
 	uint32_t v48;
 
-	reconstr_abuff->codebook_indices[0] = (compressed_buf[0] >> 11) & 0x1F;
-	reconstr_abuff->codebook_indices[1] = (compressed_buf[0] >> 6) & 0x1F;
-	reconstr_abuff->codebook_indices[2] = (compressed_buf[0] >> 2) & 0xF;
-	reconstr_abuff->codebook_indices[3] = ((compressed_buf[1] >> 14) & 3)
+	fparam->codebook_indices[0] = (compressed_buf[0] >> 11) & 0x1F;
+	fparam->codebook_indices[1] = (compressed_buf[0] >> 6) & 0x1F;
+	fparam->codebook_indices[2] = (compressed_buf[0] >> 2) & 0xF;
+	fparam->codebook_indices[3] = ((compressed_buf[1] >> 14) & 3)
 			+ 4 * (compressed_buf[0] & 3);
 
-	reconstr_abuff->codebook_indices[4] = (compressed_buf[1] >> 10) & 0xF;
-	reconstr_abuff->codebook_indices[5] = (compressed_buf[1] >> 6) & 0xF;
-	reconstr_abuff->codebook_indices[6] = (compressed_buf[1] >> 2) & 0xF;
-	reconstr_abuff->codebook_indices[7] = ((compressed_buf[2] >> 14) & 3)
+	fparam->codebook_indices[4] = (compressed_buf[1] >> 10) & 0xF;
+	fparam->codebook_indices[5] = (compressed_buf[1] >> 6) & 0xF;
+	fparam->codebook_indices[6] = (compressed_buf[1] >> 2) & 0xF;
+	fparam->codebook_indices[7] = ((compressed_buf[2] >> 14) & 3)
 			+ 4 * (compressed_buf[1] & 3);
 
-	reconstr_abuff->codebook_indices[8] = (compressed_buf[2] >> 11) & 7;
-	reconstr_abuff->codebook_indices[9] = (compressed_buf[2] >> 8) & 7;
-	reconstr_abuff->codebook_indices[10] = (compressed_buf[2] >> 5) & 7;
-	reconstr_abuff->codebook_indices[11] = (compressed_buf[2] >> 2) & 7;
-	reconstr_abuff->codebook_indices[12] = ((compressed_buf[3] >> 15) & 1)
+	fparam->codebook_indices[8] = (compressed_buf[2] >> 11) & 7;
+	fparam->codebook_indices[9] = (compressed_buf[2] >> 8) & 7;
+	fparam->codebook_indices[10] = (compressed_buf[2] >> 5) & 7;
+	fparam->codebook_indices[11] = (compressed_buf[2] >> 2) & 7;
+	fparam->codebook_indices[12] = ((compressed_buf[3] >> 15) & 1)
 			+ 2 * (compressed_buf[2] & 3);
 
-	reconstr_abuff->codebook_indices[13] = (compressed_buf[3] >> 12) & 7;
+	fparam->codebook_indices[13] = (compressed_buf[3] >> 12) & 7;
 
-	reconstr_abuff->subframe_something[0] = (compressed_buf[3] >> 7) & 0x1F;
+	fparam->subframe_something[0] = (compressed_buf[3] >> 7) & 0x1F;
 
-	reconstr_abuff->sf[0].combined_pulse_pos =
+	fparam->sf[0].combined_pulse_pos =
 			  (compressed_buf[5] & 0xff00) >> 8
 			| (compressed_buf[4] & 0xffff) << 8
 			| (compressed_buf[3] & 0x7f) << 24;
 
-	reconstr_abuff->sf[0].gain = (compressed_buf[5] >> 2) & 0x3F;
+	fparam->sf[0].gain = (compressed_buf[5] >> 2) & 0x3F;
 
-	reconstr_abuff->sf[0].pulse_val[0] = ((compressed_buf[6] >> 15) & 1)
+	fparam->sf[0].pulse_val[0] = ((compressed_buf[6] >> 15) & 1)
 			+ 2 * (compressed_buf[5] & 3);
-	reconstr_abuff->sf[0].pulse_val[1] = (compressed_buf[6] >> 12) & 7;
-	reconstr_abuff->sf[0].pulse_val[2] = (compressed_buf[6] >> 9) & 7;
-	reconstr_abuff->sf[0].pulse_val[3] = (compressed_buf[6] >> 6) & 7;
-	reconstr_abuff->sf[0].pulse_val[4] = (compressed_buf[6] >> 3) & 7;
-	reconstr_abuff->sf[0].pulse_val[5] = compressed_buf[6] & 7;
-	reconstr_abuff->sf[0].pulse_val[6] = (compressed_buf[7] >> 13) & 7;
+	fparam->sf[0].pulse_val[1] = (compressed_buf[6] >> 12) & 7;
+	fparam->sf[0].pulse_val[2] = (compressed_buf[6] >> 9) & 7;
+	fparam->sf[0].pulse_val[3] = (compressed_buf[6] >> 6) & 7;
+	fparam->sf[0].pulse_val[4] = (compressed_buf[6] >> 3) & 7;
+	fparam->sf[0].pulse_val[5] = compressed_buf[6] & 7;
+	fparam->sf[0].pulse_val[6] = (compressed_buf[7] >> 13) & 7;
 
-	reconstr_abuff->subframe_something[1] = (compressed_buf[7] >> 8) & 0x1F;
+	fparam->subframe_something[1] = (compressed_buf[7] >> 8) & 0x1F;
 
-	reconstr_abuff->sf[1].combined_pulse_pos =
+	fparam->sf[1].combined_pulse_pos =
 			  (compressed_buf[9] & 0xfe00) >> 9
 			| (compressed_buf[8] & 0xffff) << 7
 			| (compressed_buf[7] & 0xff) << 23;
 
-	reconstr_abuff->sf[1].gain = (compressed_buf[9] >> 3) & 0x3F;
+	fparam->sf[1].gain = (compressed_buf[9] >> 3) & 0x3F;
 
-	reconstr_abuff->sf[1].pulse_val[0] = compressed_buf[9] & 7;
-	reconstr_abuff->sf[1].pulse_val[1] = (compressed_buf[10] >> 13) & 7;
-	reconstr_abuff->sf[1].pulse_val[2] = (compressed_buf[10] >> 10) & 7;
-	reconstr_abuff->sf[1].pulse_val[3] = (compressed_buf[10] >> 7) & 7;
-	reconstr_abuff->sf[1].pulse_val[4] = (compressed_buf[10] >> 4) & 7;
-	reconstr_abuff->sf[1].pulse_val[5] = (compressed_buf[10] >> 1) & 7;
-	reconstr_abuff->sf[1].pulse_val[6] = ((compressed_buf[11] >> 14) & 3)
+	fparam->sf[1].pulse_val[0] = compressed_buf[9] & 7;
+	fparam->sf[1].pulse_val[1] = (compressed_buf[10] >> 13) & 7;
+	fparam->sf[1].pulse_val[2] = (compressed_buf[10] >> 10) & 7;
+	fparam->sf[1].pulse_val[3] = (compressed_buf[10] >> 7) & 7;
+	fparam->sf[1].pulse_val[4] = (compressed_buf[10] >> 4) & 7;
+	fparam->sf[1].pulse_val[5] = (compressed_buf[10] >> 1) & 7;
+	fparam->sf[1].pulse_val[6] = ((compressed_buf[11] >> 14) & 3)
 			+ 4 * (compressed_buf[10] & 1);
 
-	reconstr_abuff->subframe_something[2] = (compressed_buf[11] >> 9) & 0x1F;
+	fparam->subframe_something[2] = (compressed_buf[11] >> 9) & 0x1F;
 
-	reconstr_abuff->sf[2].combined_pulse_pos =
+	fparam->sf[2].combined_pulse_pos =
 			  (compressed_buf[13] & 0xfc00) >> 10
 			| (compressed_buf[12] & 0xffff) << 6
 			| (compressed_buf[11] & 0x1ff) << 22;
 
-	reconstr_abuff->sf[2].gain = (compressed_buf[13] >> 4) & 0x3F;
+	fparam->sf[2].gain = (compressed_buf[13] >> 4) & 0x3F;
 
-	reconstr_abuff->sf[2].pulse_val[0] = (compressed_buf[13] >> 1) & 7;
-	reconstr_abuff->sf[2].pulse_val[1] = ((compressed_buf[14] >> 14) & 3)
+	fparam->sf[2].pulse_val[0] = (compressed_buf[13] >> 1) & 7;
+	fparam->sf[2].pulse_val[1] = ((compressed_buf[14] >> 14) & 3)
 			+ 4 * (compressed_buf[14] & 1);
-	reconstr_abuff->sf[2].pulse_val[2] = (compressed_buf[14] >> 11) & 7;
-	reconstr_abuff->sf[2].pulse_val[3] = (compressed_buf[14] >> 8) & 7;
-	reconstr_abuff->sf[2].pulse_val[4] = (compressed_buf[14] >> 5) & 7;
-	reconstr_abuff->sf[2].pulse_val[5] = (compressed_buf[14] >> 2) & 7;
-	reconstr_abuff->sf[2].pulse_val[6] = ((compressed_buf[15] >> 15) & 1)
+	fparam->sf[2].pulse_val[2] = (compressed_buf[14] >> 11) & 7;
+	fparam->sf[2].pulse_val[3] = (compressed_buf[14] >> 8) & 7;
+	fparam->sf[2].pulse_val[4] = (compressed_buf[14] >> 5) & 7;
+	fparam->sf[2].pulse_val[5] = (compressed_buf[14] >> 2) & 7;
+	fparam->sf[2].pulse_val[6] = ((compressed_buf[15] >> 15) & 1)
 			+ 2 * (compressed_buf[14] & 3);
 
-	reconstr_abuff->subframe_something[3] = (compressed_buf[15] >> 10) & 0x1F;
+	fparam->subframe_something[3] = (compressed_buf[15] >> 10) & 0x1F;
 
-	reconstr_abuff->sf[3].combined_pulse_pos =
+	fparam->sf[3].combined_pulse_pos =
 			  (compressed_buf[17] & 0xf800) >> 11
 			| (compressed_buf[16] & 0xffff) << 5
 			| (compressed_buf[15] & 0x3ff) << 21;
 
-	reconstr_abuff->sf[3].gain = (compressed_buf[17] >> 5) & 0x3F;
+	fparam->sf[3].gain = (compressed_buf[17] >> 5) & 0x3F;
 
-	reconstr_abuff->sf[3].pulse_val[0] = (compressed_buf[17] >> 2) & 7;
-	reconstr_abuff->sf[3].pulse_val[1] = ((compressed_buf[18] >> 15) & 1)
+	fparam->sf[3].pulse_val[0] = (compressed_buf[17] >> 2) & 7;
+	fparam->sf[3].pulse_val[1] = ((compressed_buf[18] >> 15) & 1)
 			+ 2 * (compressed_buf[17] & 3);
-	reconstr_abuff->sf[3].pulse_val[2] = (compressed_buf[18] >> 12) & 7;
-	reconstr_abuff->sf[3].pulse_val[3] = (compressed_buf[18] >> 9) & 7;
-	reconstr_abuff->sf[3].pulse_val[4] = (compressed_buf[18] >> 6) & 7;
-	reconstr_abuff->sf[3].pulse_val[5] = (compressed_buf[18] >> 3) & 7;
-	reconstr_abuff->sf[3].pulse_val[6] = compressed_buf[18] & 7;
+	fparam->sf[3].pulse_val[2] = (compressed_buf[18] >> 12) & 7;
+	fparam->sf[3].pulse_val[3] = (compressed_buf[18] >> 9) & 7;
+	fparam->sf[3].pulse_val[4] = (compressed_buf[18] >> 6) & 7;
+	fparam->sf[3].pulse_val[5] = (compressed_buf[18] >> 3) & 7;
+	fparam->sf[3].pulse_val[6] = compressed_buf[18] & 7;
 
 ////////////////////////////////////////////////////////////////////
 	for (subframe_idx = 0; subframe_idx < 4; subframe_idx++) {
 		unsigned int C72_binomials[PULSE_MAX] = { 72, 2556, 59640, 1028790,
 				13991544, 156238908, 1473109704, 3379081753 };
 		unsigned int combined_pulse_pos =
-				reconstr_abuff->sf[subframe_idx].combined_pulse_pos;
+				fparam->sf[subframe_idx].combined_pulse_pos;
 		int index = 6;
 
 		if (combined_pulse_pos < C72_binomials[PULSE_MAX - 1]) {
@@ -172,14 +172,14 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct dss_sp_frameparam *re
 				p->pulse_dec_mode = 0;
 
 		/* why do we need this? */
-		reconstr_abuff->sf[subframe_idx].pulse_pos[6] = 0;
+		fparam->sf[subframe_idx].pulse_pos[6] = 0;
 
 		//////////////////
 		for (i = 71; i >= 0; i--) {
 			if (C72_binomials[index] <= combined_pulse_pos) {
 				combined_pulse_pos -= C72_binomials[index];
 
-				reconstr_abuff->sf[subframe_idx].pulse_pos[(index ^ 7) - 1] = i;
+				fparam->sf[subframe_idx].pulse_pos[(index ^ 7) - 1] = i;
 
 				if (!index)
 					break;
@@ -199,20 +199,18 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct dss_sp_frameparam *re
 			LABEL_22: pulse = PULSE_MAX - 1;
 			pulse_idx = 71; //GRID_SIZE
 			combined_pulse_pos =
-					reconstr_abuff->sf[subframe_idx].combined_pulse_pos;
+					fparam->sf[subframe_idx].combined_pulse_pos;
 
 			/* this part seems to be close to g723.1 gen_fcb_excitation() RATE_6300 */
 			/* TODO: 7 is what? size of subframe? */
 			for (i = 0; i < 7; i++) {
-				for (;
-						combined_pulse_pos
-								< dss_sp_combinatorial_table[pulse][pulse_idx];
+				for (;combined_pulse_pos < dss_sp_combinatorial_table[pulse][pulse_idx];
 						--pulse_idx)
 					;
 				combined_pulse_pos -=
 						dss_sp_combinatorial_table[pulse][pulse_idx];
 				pulse--;
-				reconstr_abuff->sf[subframe_idx].pulse_pos[i] = pulse_idx;
+				fparam->sf[subframe_idx].pulse_pos[i] = pulse_idx;
 			}
 		}
 	}
@@ -222,25 +220,25 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct dss_sp_frameparam *re
 
 	v46 = (v43 | ((compressed_buf[20] & 0xff00) >> 8)) / 151;
 
-	reconstr_abuff->array_20[0] =
+	fparam->array_20[0] =
 			(v43 | ((compressed_buf[20] & 0xff00) >> 8)) % 151 + 36;
 	for (i = 1; i < SUBFRAMES; i++) {
 		int v47 = v46;
 		v46 /= 48;
-		reconstr_abuff->array_20[i] = v47 - 48 * v46;
+		fparam->array_20[i] = v47 - 48 * v46;
 	}
 ////////////////////////////////////////////////////////////////////////
-	v48 = reconstr_abuff->array_20[0];
+	v48 = fparam->array_20[0];
 	for (i = 1; i < SUBFRAMES; i++) {
 		if (v48 > 162) {
-			reconstr_abuff->array_20[i] += 139;
+			fparam->array_20[i] += 139;
 		} else {
 			v51 = v48 - 23;
 			if (v51 < 36)
 				v51 = 36;
-			reconstr_abuff->array_20[i] += v51;
+			fparam->array_20[i] += v51;
 		}
-		v48 = reconstr_abuff->array_20[i];
+		v48 = fparam->array_20[i];
 
 	}
 
