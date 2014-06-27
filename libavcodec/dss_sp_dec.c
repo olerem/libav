@@ -25,7 +25,7 @@ typedef struct dss_sp_context {
     AVClass *class;
     int32_t g_unc_rw_array288_3D0DC0[288 + 6];
     int32_t g_unc_rw_arrayXX_3D08FC[187];
-	struct dss_sp_frameparam frameparam;
+	struct dss_sp_frameparam fparam;
 	int32_t working_buffer[SUBFRAMES][72];
 	int32_t g_unc_rw_array15_3D0420[15];
 	int32_t g_unc_rw_array15_3D045C[15];
@@ -54,8 +54,9 @@ static av_cold int dss_sp_decode_init(AVCodecContext *avctx)
     return 0;
 }
 
-static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct dss_sp_frameparam *fparam, const int16_t *compressed_buf) {
+static void dss_sp_unpack_coeffs(DSS_SP_Context *p, const int16_t *compressed_buf) {
 
+	struct dss_sp_frameparam *fparam = &p->fparam;
 	int i;
 	int subframe_idx;
 	uint32_t v43;
@@ -245,11 +246,11 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct dss_sp_frameparam *fp
 }
 
 /* create stage 1 array14_stage0 based on stage0 and some kind of pulse table */
-static void dss_sp_get_codebook_val(int32_t *array14_stage1, const struct dss_sp_frameparam *a2) {
+static void dss_sp_get_codebook_val(DSS_SP_Context *p) {
 	int i;
 
 	for (i = 0; i < 14; i++)
-		array14_stage1[i] = g_unc_array_3C84F0[i][a2->codebook_indices[i]];
+		p->g_unc_rw_array14_stg1_3D0D64.array14_stage1[i] = g_unc_array_3C84F0[i][p->fparam.codebook_indices[i]];
 }
 
 static void dss_sp_stabilize_coeff(struct struc_6 *struc_6_a1,
@@ -658,9 +659,9 @@ static int dss_sp_decode_frame_2(DSS_SP_Context *p, int16_t *abuf_dst, const int
 
 	int i, tmp, sf_idx;
 
-	dss_sp_unpack_coeffs(p, &p->frameparam, (const int16_t *)abuff_src);
+	dss_sp_unpack_coeffs(p, (const int16_t *)abuff_src);
 
-	dss_sp_get_codebook_val(p->g_unc_rw_array14_stg1_3D0D64.array14_stage1, &p->frameparam);
+	dss_sp_get_codebook_val(p);
 
 	dss_sp_stabilize_coeff(&p->g_unc_rw_array14_stg1_3D0D64,
 			p->g_unc_rw_array15_stg2_3D08C0);
@@ -669,10 +670,10 @@ static int dss_sp_decode_frame_2(DSS_SP_Context *p, int16_t *abuf_dst, const int
 	for (sf_idx = 0; sf_idx < SUBFRAMES; sf_idx++) {
 
 		dss_sp_sub_3B9080(p->g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC,
-				p->frameparam.array_20[sf_idx],
-				g_unc_array_3C88F8[p->frameparam.subframe_something[sf_idx]]);
+				p->fparam.array_20[sf_idx],
+				g_unc_array_3C88F8[p->fparam.subframe_something[sf_idx]]);
 
-		dss_sp_add_pulses(p->g_unc_rw_array72_3D0C44, &p->frameparam.sf[sf_idx]);
+		dss_sp_add_pulses(p->g_unc_rw_array72_3D0C44, &p->fparam.sf[sf_idx]);
 
 		dss_sp_sub_3B9FB0(p->g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC);
 
