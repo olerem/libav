@@ -46,7 +46,7 @@ static av_cold int dss_sp_decode_init(AVCodecContext *avctx)
     avctx->channel_layout = AV_CH_LAYOUT_MONO;
     avctx->sample_fmt     = AV_SAMPLE_FMT_S16;
     avctx->channels       = 1;
-    avctx->sample_rate    = 12000;
+    avctx->sample_rate    = 11025;
 
     memset(p->g_unc_rw_arrayXX_3D08FC, 0, sizeof(p->g_unc_rw_arrayXX_3D08FC));
     p->pulse_dec_mode = 1;
