@@ -207,11 +207,11 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct dss_sp_frameparam *re
 			for (i = 0; i < 7; i++) {
 				for (;
 						combined_pulse_pos
-								< dss2_combinatorial_table[pulse][pulse_idx];
+								< dss_sp_combinatorial_table[pulse][pulse_idx];
 						--pulse_idx)
 					;
 				combined_pulse_pos -=
-						dss2_combinatorial_table[pulse][pulse_idx];
+						dss_sp_combinatorial_table[pulse][pulse_idx];
 				pulse--;
 				reconstr_abuff->sf[subframe_idx].pulse_pos[i] = pulse_idx;
 			}
@@ -372,8 +372,8 @@ static void dss_sp_add_pulses(int32_t *array72_a1, const struct dss_sp_subframe 
 
 	//looks like "output[sf->pulse_pos[i]] += g_gains[sf->gain] * g_pulse_val[sf->pulse_val[i]] + 0x4000 >> 15;"
 	for (i = 0; i < 7; i++)
-		array72_a1[sf->pulse_pos[i]] += (dss2_fixed_cb_gain[sf->gain]
-				* dss2_pulse_val[sf->pulse_val[i]] + 0x4000) >> 15;
+		array72_a1[sf->pulse_pos[i]] += (dss_sp_fixed_cb_gain[sf->gain]
+				* dss_sp_pulse_val[sf->pulse_val[i]] + 0x4000) >> 15;
 
 }
 
