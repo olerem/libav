@@ -26,7 +26,7 @@ typedef struct dss_sp_context {
     int32_t g_unc_rw_array288_3D0DC0[288 + 6];
     int32_t g_unc_rw_arrayXX_3D08FC[187];
 	struct dss_sp_frameparam frameparam;
-	int32_t local_rw_array72_v101[SUBFRAMES][72];
+	int32_t working_buffer[SUBFRAMES][72];
 	int32_t g_unc_rw_array15_3D0420[15];
 	int32_t g_unc_rw_array15_3D045C[15];
 	struct struc_6 g_unc_rw_array14_stg1_3D0D64;
@@ -64,26 +64,26 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct dss_sp_frameparam *re
 	uint32_t v51;
 	uint32_t v48;
 
-	reconstr_abuff->array14_stage0[0] = (compressed_buf[0] >> 11) & 0x1F;
-	reconstr_abuff->array14_stage0[1] = (compressed_buf[0] >> 6) & 0x1F;
-	reconstr_abuff->array14_stage0[2] = (compressed_buf[0] >> 2) & 0xF;
-	reconstr_abuff->array14_stage0[3] = ((compressed_buf[1] >> 14) & 3)
+	reconstr_abuff->codebook_indices[0] = (compressed_buf[0] >> 11) & 0x1F;
+	reconstr_abuff->codebook_indices[1] = (compressed_buf[0] >> 6) & 0x1F;
+	reconstr_abuff->codebook_indices[2] = (compressed_buf[0] >> 2) & 0xF;
+	reconstr_abuff->codebook_indices[3] = ((compressed_buf[1] >> 14) & 3)
 			+ 4 * (compressed_buf[0] & 3);
 
-	reconstr_abuff->array14_stage0[4] = (compressed_buf[1] >> 10) & 0xF;
-	reconstr_abuff->array14_stage0[5] = (compressed_buf[1] >> 6) & 0xF;
-	reconstr_abuff->array14_stage0[6] = (compressed_buf[1] >> 2) & 0xF;
-	reconstr_abuff->array14_stage0[7] = ((compressed_buf[2] >> 14) & 3)
+	reconstr_abuff->codebook_indices[4] = (compressed_buf[1] >> 10) & 0xF;
+	reconstr_abuff->codebook_indices[5] = (compressed_buf[1] >> 6) & 0xF;
+	reconstr_abuff->codebook_indices[6] = (compressed_buf[1] >> 2) & 0xF;
+	reconstr_abuff->codebook_indices[7] = ((compressed_buf[2] >> 14) & 3)
 			+ 4 * (compressed_buf[1] & 3);
 
-	reconstr_abuff->array14_stage0[8] = (compressed_buf[2] >> 11) & 7;
-	reconstr_abuff->array14_stage0[9] = (compressed_buf[2] >> 8) & 7;
-	reconstr_abuff->array14_stage0[10] = (compressed_buf[2] >> 5) & 7;
-	reconstr_abuff->array14_stage0[11] = (compressed_buf[2] >> 2) & 7;
-	reconstr_abuff->array14_stage0[12] = ((compressed_buf[3] >> 15) & 1)
+	reconstr_abuff->codebook_indices[8] = (compressed_buf[2] >> 11) & 7;
+	reconstr_abuff->codebook_indices[9] = (compressed_buf[2] >> 8) & 7;
+	reconstr_abuff->codebook_indices[10] = (compressed_buf[2] >> 5) & 7;
+	reconstr_abuff->codebook_indices[11] = (compressed_buf[2] >> 2) & 7;
+	reconstr_abuff->codebook_indices[12] = ((compressed_buf[3] >> 15) & 1)
 			+ 2 * (compressed_buf[2] & 3);
 
-	reconstr_abuff->array14_stage0[13] = (compressed_buf[3] >> 12) & 7;
+	reconstr_abuff->codebook_indices[13] = (compressed_buf[3] >> 12) & 7;
 
 	reconstr_abuff->subframe_something[0] = (compressed_buf[3] >> 7) & 0x1F;
 
@@ -252,10 +252,10 @@ static void dss_sp_get_codebook_val(int32_t *array14_stage1, const struct dss_sp
 	int i;
 
 	for (i = 0; i < 14; i++)
-		array14_stage1[i] = g_unc_array_3C84F0[i][a2->array14_stage0[i]];
+		array14_stage1[i] = g_unc_array_3C84F0[i][a2->codebook_indices[i]];
 }
 
-static void dss_sp_sub_3B8410(struct struc_6 *struc_6_a1,
+static void dss_sp_stabilize_coeff(struct struc_6 *struc_6_a1,
 		int32_t *struc_6_stg2_a2) {
 	int v3; // esi@1
 	int v5; // ebx@2
@@ -657,7 +657,7 @@ static void dss_sp_32to16bit(int16_t *dst, int32_t *src, int size) {
 		dst[i] = src[i];
 }
 
-static int dss_sp_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t *abuff_src) {
+static int dss_sp_decode_frame_2(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t *abuff_src) {
 
 	int i, tmp, sf_idx;
 
@@ -665,7 +665,7 @@ static int dss_sp_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_
 
 	dss_sp_get_codebook_val(p->g_unc_rw_array14_stg1_3D0D64.array14_stage1, &p->frameparam);
 
-	dss_sp_sub_3B8410(&p->g_unc_rw_array14_stg1_3D0D64,
+	dss_sp_stabilize_coeff(&p->g_unc_rw_array14_stg1_3D0D64,
 			p->g_unc_rw_array15_stg2_3D08C0);
 
 ////////
@@ -698,16 +698,16 @@ static int dss_sp_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_
 		}
 
 		dss_sp_sub_3B80F0(p, p->g_unc_rw_array14_stg1_3D0D64.array14_stage1[0],
-				&p->local_rw_array72_v101[sf_idx][0], 72);
+				&p->working_buffer[sf_idx][0], 72);
 
 	};
 ////////
 
-	dss_sp_sub_3B98D0(p, &p->local_rw_array72_v101[0][0]);
+	dss_sp_sub_3B98D0(p, &p->working_buffer[0][0]);
 
 	dss_sp_32to16bit(abuf_dst,
-					&p->local_rw_array72_v101[0][0], 264);
-	memcpy(&p->array14_3D0DA4, p->frameparam.array14_stage0, 28u);
+					&p->working_buffer[0][0], 264);
+	memcpy(&p->array14_3D0DA4, p->frameparam.codebook_indices, 28u);
 	return 0;
 
 }
@@ -742,7 +742,7 @@ static int dss_sp_decode_frame(AVCodecContext *avctx, void *data,
 
 
     /* process frame here */
-    dss_sp_2_sub_3B8790(p, out, buf);
+    dss_sp_decode_frame_2(p, out, buf);
 
     *got_frame_ptr = 1;
 

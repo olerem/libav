@@ -24,7 +24,7 @@ struct dss_sp_subframe {
 
 struct dss_sp_frameparam {
 	int16_t	field_0;
-	int16_t	array14_stage0[14];
+	int16_t	codebook_indices[14];
 
 	int16_t subframe_something[SUBFRAMES];
 	int16_t array_20[SUBFRAMES];
