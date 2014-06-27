@@ -31,7 +31,6 @@ typedef struct dss_sp_context {
 	int32_t g_unc_rw_array15_3D045C[15];
 	struct struc_6 g_unc_rw_array14_stg1_3D0D64;
 	int32_t g_unc_rw_array15_stg2_3D08C0[15];
-	int16_t array14_3D0DA4[14];
 	int32_t g_unc_rw_array72_3D0C44[72];
 	int dword_3D0498;
 	int dword_3D0DA0;
@@ -707,7 +706,6 @@ static int dss_sp_decode_frame_2(DSS_SP_Context *p, int16_t *abuf_dst, const int
 
 	dss_sp_32to16bit(abuf_dst,
 					&p->working_buffer[0][0], 264);
-	memcpy(&p->array14_3D0DA4, p->frameparam.codebook_indices, 28u);
 	return 0;
 
 }
