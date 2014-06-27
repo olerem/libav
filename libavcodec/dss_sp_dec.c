@@ -25,7 +25,7 @@ typedef struct dss_sp_context {
     AVClass *class;
     int32_t g_unc_rw_array288_3D0DC0[288 + 6];
     int32_t g_unc_rw_arrayXX_3D08FC[187];
-	struct struc_1 struc_1_v96;
+	struct dss_sp_frameparam frameparam;
 	int32_t local_rw_array72_v101[SUBFRAMES][72];
 	int32_t g_unc_rw_array15_3D0420[15];
 	int32_t g_unc_rw_array15_3D045C[15];
@@ -37,7 +37,7 @@ typedef struct dss_sp_context {
 	int dword_3D0DA0;
 	int32_t g_unc_rw_array15_3D0BE8[15];
 
-    unsigned int word_3D0C26;
+    int pulse_dec_mode;
 
 } DSS_SP_Context;
 
@@ -49,13 +49,13 @@ static av_cold int dss_sp_decode_init(AVCodecContext *avctx)
     avctx->channels       = 1;
     avctx->sample_rate    = 12000;
 
-    memset(p->g_unc_rw_arrayXX_3D08FC, 0, 0x2ECu);
-    p->word_3D0C26 = 1;
+    memset(p->g_unc_rw_arrayXX_3D08FC, 0, sizeof(p->g_unc_rw_arrayXX_3D08FC));
+    p->pulse_dec_mode = 1;
 
     return 0;
 }
 
-static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abuff, const int16_t *compressed_buf) {
+static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct dss_sp_frameparam *reconstr_abuff, const int16_t *compressed_buf) {
 
 	int i;
 	int subframe_idx;
@@ -167,10 +167,10 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abu
 		int index = 6;
 
 		if (combined_pulse_pos < C72_binomials[PULSE_MAX - 1]) {
-			if (p->word_3D0C26 != 0)
+			if (p->pulse_dec_mode != 0)
 				goto LABEL_22;
 		} else
-				p->word_3D0C26 = 0;
+				p->pulse_dec_mode = 0;
 
 		/* why do we need this? */
 		reconstr_abuff->sf[subframe_idx].pulse_pos[6] = 0;
@@ -195,7 +195,7 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abu
 		};
 		////////////////////////////
 
-		if (p->word_3D0C26) {
+		if (p->pulse_dec_mode) {
 			int pulse, pulse_idx;
 			LABEL_22: pulse = PULSE_MAX - 1;
 			pulse_idx = 71; //GRID_SIZE
@@ -248,7 +248,7 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, struct struc_1 *reconstr_abu
 }
 
 /* create stage 1 array14_stage0 based on stage0 and some kind of pulse table */
-static void dss_sp_sub_3B8740(int32_t *array14_stage1, const struct struc_1 *a2) {
+static void dss_sp_get_codebook_val(int32_t *array14_stage1, const struct dss_sp_frameparam *a2) {
 	int i;
 
 	for (i = 0; i < 14; i++)
@@ -367,7 +367,7 @@ static void dss_sp_sub_3B8410(struct struc_6 *struc_6_a1,
 }
 
 /* this function will get pointer to one of 4 subframes */
-static void dss_sp_add_pulses(int32_t *array72_a1, const struct dss2_subframe *sf) {
+static void dss_sp_add_pulses(int32_t *array72_a1, const struct dss_sp_subframe *sf) {
 	int i;
 
 	//looks like "output[sf->pulse_pos[i]] += g_gains[sf->gain] * g_pulse_val[sf->pulse_val[i]] + 0x4000 >> 15;"
@@ -661,9 +661,9 @@ static int dss_sp_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_
 
 	int i, tmp, sf_idx;
 
-	dss_sp_unpack_coeffs(p, &p->struc_1_v96, (const int16_t *)abuff_src);
+	dss_sp_unpack_coeffs(p, &p->frameparam, (const int16_t *)abuff_src);
 
-	dss_sp_sub_3B8740(p->g_unc_rw_array14_stg1_3D0D64.array14_stage1, &p->struc_1_v96);
+	dss_sp_get_codebook_val(p->g_unc_rw_array14_stg1_3D0D64.array14_stage1, &p->frameparam);
 
 	dss_sp_sub_3B8410(&p->g_unc_rw_array14_stg1_3D0D64,
 			p->g_unc_rw_array15_stg2_3D08C0);
@@ -672,10 +672,10 @@ static int dss_sp_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_
 	for (sf_idx = 0; sf_idx < SUBFRAMES; sf_idx++) {
 
 		dss_sp_sub_3B9080(p->g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC,
-				p->struc_1_v96.array_20[sf_idx],
-				g_unc_array_3C88F8[p->struc_1_v96.subframe_something[sf_idx]]);
+				p->frameparam.array_20[sf_idx],
+				g_unc_array_3C88F8[p->frameparam.subframe_something[sf_idx]]);
 
-		dss_sp_add_pulses(p->g_unc_rw_array72_3D0C44, &p->struc_1_v96.sf[sf_idx]);
+		dss_sp_add_pulses(p->g_unc_rw_array72_3D0C44, &p->frameparam.sf[sf_idx]);
 
 		dss_sp_sub_3B9FB0(p->g_unc_rw_array72_3D0C44, p->g_unc_rw_arrayXX_3D08FC);
 
@@ -707,7 +707,7 @@ static int dss_sp_2_sub_3B8790(DSS_SP_Context *p, int16_t *abuf_dst, const int8_
 
 	dss_sp_32to16bit(abuf_dst,
 					&p->local_rw_array72_v101[0][0], 264);
-	memcpy(&p->array14_3D0DA4, p->struc_1_v96.array14_stage0, 28u);
+	memcpy(&p->array14_3D0DA4, p->frameparam.array14_stage0, 28u);
 	return 0;
 
 }

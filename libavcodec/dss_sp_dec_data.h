@@ -14,7 +14,7 @@
 #define DSS_SP_FRAME_SIZE 42
 #define DSS_SP_SAMPLE_COUNT (66 * SUBFRAMES)
 
-struct dss2_subframe {
+struct dss_sp_subframe {
 	int16_t gain;
 	int16_t field_2;
 	int32_t combined_pulse_pos;
@@ -22,14 +22,14 @@ struct dss2_subframe {
 	int16_t pulse_val[7]; /* this values was get directly from decompressor */
 };
 
-struct struc_1 {
+struct dss_sp_frameparam {
 	int16_t	field_0;
 	int16_t	array14_stage0[14];
 
 	int16_t subframe_something[SUBFRAMES];
 	int16_t array_20[SUBFRAMES];
 
-	struct dss2_subframe sf[SUBFRAMES];
+	struct dss_sp_subframe sf[SUBFRAMES];
 };
 
 struct struc_6 {
