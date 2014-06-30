@@ -600,12 +600,12 @@ static void dss_sp_32to16bit(int16_t *dst, int32_t *src, int size) {
     int i;
 
     for (i = 0; i < size; i++)
-        dst[i] = src[i];
+        dst[i] = av_clip_int16(src[i]);
 }
 
 static int dss_sp_decode_one_frame(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t *abuff_src) {
 
-    int i, tmp, sf_idx;
+    int i, sf_idx;
 
     dss_sp_unpack_coeffs(p, (const int16_t *)abuff_src); //todo proper bitstream reading
 
