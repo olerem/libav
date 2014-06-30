@@ -14,6 +14,8 @@
 
 #include "dss_sp_dec_data.h"
 
+#define DSS_FORMULA(a, b, c)		(((a) * (b) + (c) * 32768) + 16384) / 32768
+
 struct dss_sp_subframe {
 	int16_t gain;
 	int32_t combined_pulse_pos;
@@ -46,7 +48,6 @@ typedef struct dss_sp_context {
     int32_t filter[15];
     int32_t vector_buf[72];
     int noise_state;
-    int dither_sign;
     int32_t err_buf2[15];
 
     int pulse_dec_mode;
@@ -286,10 +287,10 @@ static void dss_sp_convert_coeffs(struct lpc_data *lpc,
                 // 4, 4, 4
                 v8 = coeffs[1 + v5 - counter];
                 // 8, 8, c
-                tmp = (lpc->filter[v5] * v8 + (v7 << 15) + 0x4000) >> 15;
+                tmp = DSS_FORMULA(lpc->filter[v5], v8, v7);
                 coeffs[counter] = av_clip_int16(tmp);
 
-                tmp = (lpc->filter[v5] * v7 + (v8 << 15) + 0x4000) >> 15;
+                tmp = DSS_FORMULA(lpc->filter[v5], v7, v8);
                 coeffs[1 + v5 - counter] = av_clip_int16(tmp);
             }            
         }
@@ -320,7 +321,7 @@ static void dss_sp_convert_coeffs(struct lpc_data *lpc,
                 int v17 = v14 - v16;
                 int v19 = coeffs[v17 + 1];
 
-                tmp = (struc_6_v14->filter[0] * v19 + (coeffs[v16] << 15) + 0x4000) >> 15;
+                tmp = DSS_FORMULA(struc_6_v14->filter[0], v19, coeffs[v16]);
                 coeffs[v16] = tmp;
                 tmp &= 0xFFFF8000;
                 if ( tmp && tmp != 0xFFFF8000 )
@@ -328,7 +329,7 @@ static void dss_sp_convert_coeffs(struct lpc_data *lpc,
 
                 struc_6_v14 = struc_6_v29;
 
-                int v22 = (coeffs[v16] * struc_6_v29->filter[0] + (v19 << 15) + 0x4000) >> 15;
+                tmp = DSS_FORMULA(coeffs[v16], struc_6_v29->filter[0], v19);
                 coeffs[v17] = v22;
                 v22 &= 0xFFFF8000;
                 if ( v22 && v22 != 0xFFFF8000 )
@@ -520,13 +521,12 @@ static void dss_sp_sf_synthesis(DSS_SP_Context *p, int32_t a0,
 
     if (size > 1) {
         for (i = size - 1; i > 0; i--) {
-            tmp = ((v11 * p->vector_buf[i - 1] + (p->vector_buf[i] << 15)) + 0x4000)
-                    >> 15;
+            tmp = DSS_FORMULA(v11, p->vector_buf[i - 1], p->vector_buf[i]);
             p->vector_buf[i] = av_clip_int16(tmp);
         }
     }
 
-    tmp = (v36 * v11 + (p->vector_buf[0] << 15) + 16384) >> 15;
+    tmp = DSS_FORMULA(v11, v36, p->vector_buf[0]);
     p->vector_buf[0] = av_clip_int16(tmp);
 
     dss_sp_scale_vector(p->vector_buf, -normalize_bits, size);
@@ -630,16 +630,6 @@ static int dss_sp_decode_one_frame(DSS_SP_Context *p, int16_t *abuf_dst, const i
 
         dss_sp_shift_sq_sub(p->filter,
                 p->err_buf2, p->vector_buf);
-
-        for (i = 0; i < 72; i++) {
-            tmp = (((p->dither_sign << 13) - p->dither_sign)
-                    + (p->vector_buf[i] << 15) + 0x4000) >> 15;
-            if (tmp < -32768 || tmp > 32767) {
-                tmp = av_clip_int16(tmp);
-                p->dither_sign = tmp;
-            }
-            p->vector_buf[i] = tmp;
-        }
 
         dss_sp_sf_synthesis(p, p->lpc.filter[0],
                 &p->working_buffer[sf_idx][0], 72);
