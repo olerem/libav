@@ -14,7 +14,7 @@
 
 #include "dss_sp_dec_data.h"
 
-#define DSS_FORMULA(a, b, c)		(((a) * (b) + (c) * 32768) + 16384) / 32768
+#define DSS_FORMULA(a, b, c)		((((a) << 15) + (b) * (c)) + 0x4000) >> 15
 
 struct dss_sp_subframe {
 	int16_t gain;
@@ -266,32 +266,25 @@ static void dss_sp_unpack_filter(DSS_SP_Context *p) {
 
 static void dss_sp_convert_coeffs(struct lpc_data *lpc,
         int32_t *coeffs) {
-    int v3; // esi@1
-    int v5; // ebx@2
-    signed int v6; // eax@2
-    int v7; // esi@3
-    int v8; // edi@3
-
-    int counter; // [sp+2Ch] [bp+8h]@2
-
-    int tmp;
+    int a, a_plus;
+    int counter;
 
     coeffs[0] = 0x2000;
-    for (v3 = 0; v3 < 14; v3++) {
-        v5 = v3;
-        v6 = v3 + 1;
-        coeffs[v3 + 1] = lpc->filter[v3] >> 2;
-        if (v6 / 2 >= 1) {
-            for (counter = 1; counter <= v6/ 2; counter++) {
-                v7 = coeffs[counter];
-                // 4, 4, 4
-                v8 = coeffs[1 + v5 - counter];
-                // 8, 8, c
-                tmp = DSS_FORMULA(lpc->filter[v5], v8, v7);
+    for (a = 0; a < 14; a++) {
+        a_plus = a + 1;
+        coeffs[a_plus] = lpc->filter[a] >> 2;
+        if (a_plus / 2 >= 1) {
+            for (counter = 1; counter <= a_plus / 2; counter++) {
+                int coeff_1, coeff_2, tmp;
+
+                coeff_1 = coeffs[counter];
+                coeff_2 = coeffs[a_plus - counter];
+
+                tmp = DSS_FORMULA(coeff_1, lpc->filter[a], coeff_2);
                 coeffs[counter] = av_clip_int16(tmp);
 
-                tmp = DSS_FORMULA(lpc->filter[v5], v7, v8);
-                coeffs[1 + v5 - counter] = av_clip_int16(tmp);
+                tmp = DSS_FORMULA(coeff_2, lpc->filter[a], coeff_1);
+                coeffs[a_plus - counter] = av_clip_int16(tmp);
             }            
         }
     }
@@ -321,7 +314,7 @@ static void dss_sp_convert_coeffs(struct lpc_data *lpc,
                 int v17 = v14 - v16;
                 int v19 = coeffs[v17 + 1];
 
-                tmp = DSS_FORMULA(struc_6_v14->filter[0], v19, coeffs[v16]);
+                tmp = DSS_FORMULA(coeffs[v16], struc_6_v14->filter[0], v19);
                 coeffs[v16] = tmp;
                 tmp &= 0xFFFF8000;
                 if ( tmp && tmp != 0xFFFF8000 )
@@ -329,7 +322,7 @@ static void dss_sp_convert_coeffs(struct lpc_data *lpc,
 
                 struc_6_v14 = struc_6_v29;
 
-                tmp = DSS_FORMULA(coeffs[v16], struc_6_v29->filter[0], v19);
+                tmp = DSS_FORMULA(v19, coeffs[v16], struc_6_v29->filter[0]);
                 coeffs[v17] = v22;
                 v22 &= 0xFFFF8000;
                 if ( v22 && v22 != 0xFFFF8000 )
@@ -478,22 +471,28 @@ static int dss_sp_get_normalize_bits(int32_t *array_var, int16_t size) {
     return max_val;
 }
 
+static int dss_sp_vector_sum(DSS_SP_Context *p, int size)
+{
+	int i, sum = 0;
+    for (i = 0; i < size; i++)
+        sum += FFABS(p->vector_buf[i]);
+    return sum;
+}
+
 static void dss_sp_sf_synthesis(DSS_SP_Context *p, int32_t a0,
         int32_t *dst, int size) {
 
     int32_t local_rw_array15_v1a[15];
     int32_t local_rw_array15_v39[15];
     int32_t noise[72];
-    int v11, v22, bias, v18, v34, v36, normalize_bits;
+    int v11, v22, bias, vsum_2, vsum_1, v36, normalize_bits;
     int i, tmp;
 
-    v34 = 0;
     if (size > 0) {
-        for (i = 0; i < size; i++)
-            v34 += FFABS(p->vector_buf[i]);
+    	vsum_1 = dss_sp_vector_sum(p, size);
 
-        if (v34 > 0xFFFFF)
-            v34 = 0xFFFFF;
+        if (vsum_1 > 0xFFFFF)
+            vsum_1 = 0xFFFFF;
     }
 
     normalize_bits = dss_sp_get_normalize_bits(p->vector_buf, size);
@@ -521,25 +520,24 @@ static void dss_sp_sf_synthesis(DSS_SP_Context *p, int32_t a0,
 
     if (size > 1) {
         for (i = size - 1; i > 0; i--) {
-            tmp = DSS_FORMULA(v11, p->vector_buf[i - 1], p->vector_buf[i]);
+            tmp = DSS_FORMULA(p->vector_buf[i], v11, p->vector_buf[i - 1]);
             p->vector_buf[i] = av_clip_int16(tmp);
         }
     }
 
-    tmp = DSS_FORMULA(v11, v36, p->vector_buf[0]);
+    tmp = DSS_FORMULA(p->vector_buf[0], v11, v36);
     p->vector_buf[0] = av_clip_int16(tmp);
 
     dss_sp_scale_vector(p->vector_buf, -normalize_bits, size);
     dss_sp_scale_vector(p->audio_buf, -normalize_bits, 15);
     dss_sp_scale_vector(p->err_buf1, -normalize_bits, 15);
 
-    v18 = 0;
-    if (size > 0)
-        for (i = 0; i < size; i++)
-            v18 += FFABS(p->vector_buf[i]);
 
-    if (v18 >= 0x40)
-        v22 = (v34 << 11) / v18;
+    if (size > 0)
+        vsum_2 = dss_sp_vector_sum(p, size);
+
+    if (vsum_2 >= 0x40)
+        v22 = (vsum_1 << 11) / vsum_2;
     else
         v22 = 1;
 
