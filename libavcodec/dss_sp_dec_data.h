@@ -1,12 +1,26 @@
 /*
- * dss2_decoder
+ * dss_sp audio decoder
+ * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
  *
- *  Created on: 03.06.2014
- *      Autor: lex
+ * This file is part of Libav.
+ *
+ * Libav is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * Libav is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Libav; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef DSS__
-#define DSS__
+#ifndef DSS_SP_DEC_DATA_H
+#define DSS_SP_DEC_DATA_H
 
 #define SUBFRAMES		4
 #define PULSE_MAX		8
@@ -243,4 +257,4 @@ static const int32_t dss_sp_sinc[67] = {
 		  139,   269,   336,   356,   348,   323,   293,   262,
 };
 
-#endif /* DSS__ */
+#endif /* DSS_SP_DEC_DATA_H */
