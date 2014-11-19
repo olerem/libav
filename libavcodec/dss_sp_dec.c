@@ -656,8 +656,7 @@ static int dss_sp_vector_sum(DSS_SP_Context *p, int size)
 static void dss_sp_sf_synthesis(DSS_SP_Context *p, int32_t a0,
         int32_t *dst, int size) {
 
-    int32_t local_rw_array15_v1a[15];
-    int32_t local_rw_array15_v39[15];
+    int32_t tmp_buf[15];
     int32_t noise[72];
     int v11, v22, bias, vsum_2, vsum_1, v36, normalize_bits;
     int i, tmp;
@@ -677,14 +676,14 @@ static void dss_sp_sf_synthesis(DSS_SP_Context *p, int32_t a0,
 
     v36 = p->err_buf1[1];
 
-    dss_sp_vec_mult(p->filter, local_rw_array15_v39,
+    dss_sp_vec_mult(p->filter, tmp_buf,
             binary_decreasing_array);
-    dss_sp_shift_sq_add(local_rw_array15_v39, p->audio_buf,
+    dss_sp_shift_sq_add(tmp_buf, p->audio_buf,
             p->vector_buf);
 
-    dss_sp_vec_mult(p->filter, local_rw_array15_v1a,
+    dss_sp_vec_mult(p->filter, tmp_buf,
             dss_sp_unc_decreasing_array);
-    dss_sp_shift_sq_sub(local_rw_array15_v1a,
+    dss_sp_shift_sq_sub(tmp_buf,
             p->err_buf1, p->vector_buf);
 
     /* a0 can be negative */
