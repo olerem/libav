@@ -299,7 +299,7 @@ static const int32_t dss_sp_sinc[67] = {
 		  -67,  -358,  -733, -1178, -1668, -2162, -2607, -2940,
 		-3090, -2986, -2562, -1760,  -541,  1110,  3187,  5651,
 		 8435, 11446, 14568, 17670, 20611, 23251, 25460, 27125,
-	                  	  28160, 28512, 28160,
+                          28160, 28512, 28160,
 		27125, 25460, 23251, 20611, 17670, 14568, 11446,  8435,
 		 5651,  3187,  1110,  -541, -1760, -2562, -2986, -3090,
 		-2940, -2607, -2162, -1668, -1178,  -733,  -358,   -67,
@@ -355,7 +355,6 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, const uint8_t *src)
             fparam->sf[subframe_idx].pulse_val[i] = get_bits(&gb, 3);
     }
 
-////////////////////////////////////////////////////////////////////
     for (subframe_idx = 0; subframe_idx < 4; subframe_idx++) {
         unsigned int C72_binomials[PULSE_MAX] = {
             72, 2556, 59640, 1028790, 13991544, 156238908,
@@ -373,7 +372,9 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, const uint8_t *src)
                 combined_pulse_pos =
                     fparam->sf[subframe_idx].combined_pulse_pos;
 
-                /* this part seems to be close to g723.1 gen_fcb_excitation() RATE_6300 */
+                /* this part seems to be close to g723.1 gen_fcb_excitation()
+                 * RATE_6300 */
+
                 /* TODO: 7 is what? size of subframe? */
                 for (i = 0; i < 7; i++) {
                     for (; combined_pulse_pos < dss_sp_combinatorial_table[pulse][pulse_idx];
@@ -391,7 +392,6 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, const uint8_t *src)
             /* why do we need this? */
             fparam->sf[subframe_idx].pulse_pos[6] = 0;
 
-            //////////////////
             for (i = 71; i >= 0; i--) {
                 if (C72_binomials[index] <= combined_pulse_pos) {
                     combined_pulse_pos -= C72_binomials[index];
@@ -412,7 +412,6 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, const uint8_t *src)
         }
     }
 
-/////////////////////////////////////////////////////////////////////////
     combined_pitch = get_bits(&gb, 24);
 
     fparam->pitch_lag[0] = (combined_pitch % 151) + 36;
@@ -423,7 +422,7 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, const uint8_t *src)
         fparam->pitch_lag[i] = combined_pitch % 48;
         combined_pitch /= 48;
     }
-////////////////////////////////////////////////////////////////////////
+
     v48 = fparam->pitch_lag[0];
     for (i = 1; i < SUBFRAMES; i++) {
         if (v48 > 162) {
@@ -467,7 +466,7 @@ static void dss_sp_convert_coeffs(struct lpc_data *lpc,
 
                 tmp = DSS_FORMULA(coeff_2, lpc->filter[a], coeff_1);
                 coeffs[a_plus - counter] = av_clip_int16(tmp);
-            }            
+            }
         }
     }
 
@@ -549,7 +548,8 @@ static void dss_sp_gen_exc(int32_t *vector, int32_t *prev_exc, int pitch_lag, in
 
     int i;
 
-    /* do we actually need this check? we can use just [a3 - i % a3] for both cases */
+    /* do we actually need this check? we can use just [a3 - i % a3]
+     * for both cases */
     if (pitch_lag < 72)
         for (i = 0; i < 72; i++)
             vector[i] = prev_exc[pitch_lag - i % pitch_lag];
@@ -596,7 +596,8 @@ static void dss_sp_shift_sq_sub(const int32_t *array_a1,
         for (i = 14; i > 0; i--)
             tmp -= array_a2[i] * array_a1[i];
 
-        /* original code overwrite array_a2[1] two times - makes no sense for me. */
+        /* asm overwrite array_a2[1] two times -
+         * makes no sense for me. */
         for (i = 14; i > 0; i--)
             array_a2[i] = array_a2[i - 1];
 
@@ -794,7 +795,6 @@ static int dss_sp_decode_one_frame(DSS_SP_Context *p,
 
     dss_sp_convert_coeffs(&p->lpc, p->filter);
 
-////////
     for (sf_idx = 0; sf_idx < SUBFRAMES; sf_idx++) {
 
         dss_sp_gen_exc(p->vector_buf, p->history,
@@ -816,7 +816,6 @@ static int dss_sp_decode_one_frame(DSS_SP_Context *p,
                 &p->working_buffer[sf_idx][0], 72);
 
     }
-////////
 
     dss_sp_update_state(p, &p->working_buffer[0][0]);
 
