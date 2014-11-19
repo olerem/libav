@@ -25,10 +25,12 @@
 #include "libavutil/opt.h"
 #include "avcodec.h"
 #include "internal.h"
+#include "get_bits.h"
 
 #include "dss_sp_dec_data.h"
 
 #define DSS_FORMULA(a, b, c)		((((a) << 15) + (b) * (c)) + 0x4000) >> 15
+#define DSS_FRAME_SIZE 42
 
 struct dss_sp_subframe {
 	int16_t gain;
@@ -66,6 +68,7 @@ typedef struct dss_sp_context {
 
     int pulse_dec_mode;
 
+    DECLARE_ALIGNED(16, uint8_t, bits)[DSS_FRAME_SIZE + FF_INPUT_BUFFER_PADDING_SIZE];
 } DSS_SP_Context;
 
 static av_cold int dss_sp_decode_init(AVCodecContext *avctx)
@@ -82,109 +85,40 @@ static av_cold int dss_sp_decode_init(AVCodecContext *avctx)
     return 0;
 }
 
-static void dss_sp_unpack_coeffs(DSS_SP_Context *p, const int16_t *src) {
-
+static void dss_sp_unpack_coeffs(DSS_SP_Context *p, const uint8_t *src)
+{
+    GetBitContext gb;
     struct dsp_sp_frame *fparam = &p->fparam;
     int i;
     int subframe_idx;
-    uint32_t v43;
-    int v46;
+    uint32_t combined_pitch;
     uint32_t v51;
     uint32_t v48;
 
-    fparam->filter_idx[0] = (src[0] >> 11) & 0x1F;
-    fparam->filter_idx[1] = (src[0] >> 6) & 0x1F;
-    fparam->filter_idx[2] = (src[0] >> 2) & 0xF;
-    fparam->filter_idx[3] = ((src[1] >> 14) & 3)
-            + 4 * (src[0] & 3);
+    for (i = 0; i < DSS_FRAME_SIZE; i += 2) {
+        p->bits[i]     = src[i + 1];
+        p->bits[i + 1] = src[i];
+    }
 
-    fparam->filter_idx[4] = (src[1] >> 10) & 0xF;
-    fparam->filter_idx[5] = (src[1] >> 6) & 0xF;
-    fparam->filter_idx[6] = (src[1] >> 2) & 0xF;
-    fparam->filter_idx[7] = ((src[2] >> 14) & 3)
-            + 4 * (src[1] & 3);
+    init_get_bits(&gb, p->bits, DSS_FRAME_SIZE * 8);
 
-    fparam->filter_idx[8] = (src[2] >> 11) & 7;
-    fparam->filter_idx[9] = (src[2] >> 8) & 7;
-    fparam->filter_idx[10] = (src[2] >> 5) & 7;
-    fparam->filter_idx[11] = (src[2] >> 2) & 7;
-    fparam->filter_idx[12] = ((src[3] >> 15) & 1)
-            + 2 * (src[2] & 3);
+    for (i = 0; i < 2; i++)
+        fparam->filter_idx[i] = get_bits(&gb, 5);
+    for (     ; i < 8; i++)
+        fparam->filter_idx[i] = get_bits(&gb, 4);
+    for (     ; i < 14; i++)
+        fparam->filter_idx[i] = get_bits(&gb, 3);
 
-    fparam->filter_idx[13] = (src[3] >> 12) & 7;
+    for (subframe_idx = 0; subframe_idx < 4; subframe_idx++) {
+        fparam->sf_adaptive_gain[subframe_idx] = get_bits(&gb, 5);
 
-    fparam->sf_adaptive_gain[0] = (src[3] >> 7) & 0x1F;
+        fparam->sf[subframe_idx].combined_pulse_pos = get_bits_long(&gb, 31);
 
-    fparam->sf[0].combined_pulse_pos =
-              (src[5] & 0xff00) >> 8
-            | (src[4] & 0xffff) << 8
-            | (src[3] & 0x7f) << 24;
+        fparam->sf[subframe_idx].gain = get_bits(&gb, 6);
 
-    fparam->sf[0].gain = (src[5] >> 2) & 0x3F;
-
-    fparam->sf[0].pulse_val[0] = ((src[6] >> 15) & 1)
-            + 2 * (src[5] & 3);
-    fparam->sf[0].pulse_val[1] = (src[6] >> 12) & 7;
-    fparam->sf[0].pulse_val[2] = (src[6] >> 9) & 7;
-    fparam->sf[0].pulse_val[3] = (src[6] >> 6) & 7;
-    fparam->sf[0].pulse_val[4] = (src[6] >> 3) & 7;
-    fparam->sf[0].pulse_val[5] = src[6] & 7;
-    fparam->sf[0].pulse_val[6] = (src[7] >> 13) & 7;
-
-    fparam->sf_adaptive_gain[1] = (src[7] >> 8) & 0x1F;
-
-    fparam->sf[1].combined_pulse_pos =
-              (src[9] & 0xfe00) >> 9
-            | (src[8] & 0xffff) << 7
-            | (src[7] & 0xff) << 23;
-
-    fparam->sf[1].gain = (src[9] >> 3) & 0x3F;
-
-    fparam->sf[1].pulse_val[0] = src[9] & 7;
-    fparam->sf[1].pulse_val[1] = (src[10] >> 13) & 7;
-    fparam->sf[1].pulse_val[2] = (src[10] >> 10) & 7;
-    fparam->sf[1].pulse_val[3] = (src[10] >> 7) & 7;
-    fparam->sf[1].pulse_val[4] = (src[10] >> 4) & 7;
-    fparam->sf[1].pulse_val[5] = (src[10] >> 1) & 7;
-    fparam->sf[1].pulse_val[6] = ((src[11] >> 14) & 3)
-            + 4 * (src[10] & 1);
-
-    fparam->sf_adaptive_gain[2] = (src[11] >> 9) & 0x1F;
-
-    fparam->sf[2].combined_pulse_pos =
-              (src[13] & 0xfc00) >> 10
-            | (src[12] & 0xffff) << 6
-            | (src[11] & 0x1ff) << 22;
-
-    fparam->sf[2].gain = (src[13] >> 4) & 0x3F;
-
-    fparam->sf[2].pulse_val[0] = (src[13] >> 1) & 7;
-    fparam->sf[2].pulse_val[1] = ((src[14] >> 14) & 3)
-            + 4 * (src[14] & 1);
-    fparam->sf[2].pulse_val[2] = (src[14] >> 11) & 7;
-    fparam->sf[2].pulse_val[3] = (src[14] >> 8) & 7;
-    fparam->sf[2].pulse_val[4] = (src[14] >> 5) & 7;
-    fparam->sf[2].pulse_val[5] = (src[14] >> 2) & 7;
-    fparam->sf[2].pulse_val[6] = ((src[15] >> 15) & 1)
-            + 2 * (src[14] & 3);
-
-    fparam->sf_adaptive_gain[3] = (src[15] >> 10) & 0x1F;
-
-    fparam->sf[3].combined_pulse_pos =
-              (src[17] & 0xf800) >> 11
-            | (src[16] & 0xffff) << 5
-            | (src[15] & 0x3ff) << 21;
-
-    fparam->sf[3].gain = (src[17] >> 5) & 0x3F;
-
-    fparam->sf[3].pulse_val[0] = (src[17] >> 2) & 7;
-    fparam->sf[3].pulse_val[1] = ((src[18] >> 15) & 1)
-            + 2 * (src[17] & 3);
-    fparam->sf[3].pulse_val[2] = (src[18] >> 12) & 7;
-    fparam->sf[3].pulse_val[3] = (src[18] >> 9) & 7;
-    fparam->sf[3].pulse_val[4] = (src[18] >> 6) & 7;
-    fparam->sf[3].pulse_val[5] = (src[18] >> 3) & 7;
-    fparam->sf[3].pulse_val[6] = src[18] & 7;
+        for (i = 0; i < 7; i++)
+            fparam->sf[subframe_idx].pulse_val[i] = get_bits(&gb, 3);
+    }
 
 ////////////////////////////////////////////////////////////////////
     for (subframe_idx = 0; subframe_idx < 4; subframe_idx++) {
@@ -244,16 +178,15 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, const int16_t *src) {
     }
 
 /////////////////////////////////////////////////////////////////////////
-    v43 = (src[19] & 0xffff) << 8;
+    combined_pitch = get_bits(&gb, 24);
 
-    v46 = (v43 | ((src[20] & 0xff00) >> 8)) / 151;
+    fparam->pitch_lag[0] = (combined_pitch % 151) + 36;
 
-    fparam->pitch_lag[0] =
-            (v43 | ((src[20] & 0xff00) >> 8)) % 151 + 36;
+    combined_pitch /= 151;
+
     for (i = 1; i < SUBFRAMES; i++) {
-        int v47 = v46;
-        v46 /= 48;
-        fparam->pitch_lag[i] = v47 - 48 * v46;
+        fparam->pitch_lag[i] = combined_pitch % 48;
+        combined_pitch /= 48;
     }
 ////////////////////////////////////////////////////////////////////////
     v48 = fparam->pitch_lag[0];
@@ -615,11 +548,11 @@ static void dss_sp_32to16bit(int16_t *dst, int32_t *src, int size) {
         dst[i] = av_clip_int16(src[i]);
 }
 
-static int dss_sp_decode_one_frame(DSS_SP_Context *p, int16_t *abuf_dst, const int8_t *abuff_src) {
+static int dss_sp_decode_one_frame(DSS_SP_Context *p, int16_t *abuf_dst, const uint8_t *abuff_src) {
 
     int i, sf_idx;
 
-    dss_sp_unpack_coeffs(p, (const int16_t *)abuff_src); //todo proper bitstream reading
+    dss_sp_unpack_coeffs(p, abuff_src);
 
     dss_sp_unpack_filter(p);
 
