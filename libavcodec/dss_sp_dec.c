@@ -264,10 +264,6 @@ static const int16_t  dss_sp_fixed_cb_gain[64] = {
     2682, 2931, 3204, 3502, 3828, 4184, 4574, 5000,
 };
 
-static const int16_t g_unc_array_3C8870[4] = {
-    -8166, -2419, 1997, 6705
-};
-
 static const int16_t  dss_sp_pulse_val[8] = {
     -31182, -22273, -13364, -4455, 4455, 13364, 22273, 31182
 };
@@ -287,11 +283,6 @@ static const int16_t dss_sp_adaptive_gain[] = {
 		1133, 1261, 1390, 1519, 1648, 1777, 1905, 2034,
 		2163, 2292, 2421, 2550, 2678, 2807, 2936, 3065,
 		3194, 3323, 3451, 3580, 3709, 3838, 3967, 4096,
-};
-
-static const int16_t g_unc_array_3C8938[] = {
-		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-		20, 22, 24, 26, 28, 30, 34, 40, 46, 52, 60, 72, 84,
 };
 
 static const int32_t dss_sp_sinc[67] = {
@@ -327,8 +318,8 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, const uint8_t *src)
     int i;
     int subframe_idx;
     uint32_t combined_pitch;
-    uint32_t v51;
-    uint32_t v48;
+    uint32_t tmp;
+    uint32_t pitch_lag;
 
     for (i = 0; i < DSS_FRAME_SIZE; i += 2) {
         p->bits[i]     = src[i + 1];
@@ -368,7 +359,7 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, const uint8_t *src)
             if (p->pulse_dec_mode) {
                 int pulse, pulse_idx;
                 pulse = PULSE_MAX - 1;
-                pulse_idx = 71; //GRID_SIZE
+                pulse_idx = 71;
                 combined_pulse_pos =
                     fparam->sf[subframe_idx].combined_pulse_pos;
 
@@ -423,17 +414,17 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, const uint8_t *src)
         combined_pitch /= 48;
     }
 
-    v48 = fparam->pitch_lag[0];
+    pitch_lag = fparam->pitch_lag[0];
     for (i = 1; i < SUBFRAMES; i++) {
-        if (v48 > 162) {
+        if (pitch_lag > 162) {
             fparam->pitch_lag[i] += 162 - 23;
         } else {
-            v51 = v48 - 23;
-            if (v51 < 36)
-                v51 = 36;
-            fparam->pitch_lag[i] += v51;
+            tmp = pitch_lag - 23;
+            if (tmp < 36)
+                tmp = 36;
+            fparam->pitch_lag[i] += tmp;
         }
-        v48 = fparam->pitch_lag[i];
+        pitch_lag = fparam->pitch_lag[i];
     }
 }
 
@@ -741,14 +732,7 @@ static void dss_sp_sf_synthesis(DSS_SP_Context *p, int32_t a0,
 }
 
 static void dss_sp_update_state(DSS_SP_Context *p, int32_t *dst) {
-    int v1;
-
-    signed int v10;
-
-    int tmp;
-    int i, offset, counter;
-
-    v1 = 0;
+    int i, offset, counter, a = 0;
 
     for (i = 0; i < 6; i++)
         p->excitation[i] = p->excitation[288 + i];
@@ -759,20 +743,21 @@ static void dss_sp_update_state(DSS_SP_Context *p, int32_t *dst) {
     offset = 6;
     counter = 0;
     do {
-        v10 = 0;
+        int tmp = 0;
+
         for (i = 0; i < 6; i++)
-            v10 += p->excitation[offset--]
-                    * dss_sp_sinc[v1 + i * 11];
+            tmp += p->excitation[offset--]
+                    * dss_sp_sinc[a + i * 11];
 
         offset += 7;
 
-        tmp = v10 >> 15;
+        tmp >>= 15;
         dst[counter] = av_clip_int16(tmp);
 
         counter++;
 
-        v1 = (v1 + 1) % 11;
-        if (!v1)
+        a = (a + 1) % 11;
+        if (!a)
             offset++;
     } while (offset < FF_ARRAY_ELEMS(p->excitation));
 }
