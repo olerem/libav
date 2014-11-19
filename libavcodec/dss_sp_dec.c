@@ -27,35 +27,33 @@
 #include "internal.h"
 #include "get_bits.h"
 
-
-
 #define SUBFRAMES		4
 #define PULSE_MAX		8
-#define DSS_CBUF_SIZE	21
-#define DSS_SP_FRAME_SIZE 42
-#define DSS_SP_SAMPLE_COUNT (66 * SUBFRAMES)
+#define DSS_CBUF_SIZE		21
+#define DSS_SP_FRAME_SIZE	42
+#define DSS_SP_SAMPLE_COUNT	(66 * SUBFRAMES)
 
-#define DSS_FORMULA(a, b, c)		((((a) << 15) + (b) * (c)) + 0x4000) >> 15
-#define DSS_FRAME_SIZE 42
+#define DSS_FORMULA(a, b, c)	((((a) << 15) + (b) * (c)) + 0x4000) >> 15
+#define DSS_FRAME_SIZE		42
 
 struct dss_sp_subframe {
-	int16_t gain;
-	int32_t combined_pulse_pos;
-	int16_t pulse_pos[7]; /* this values was calculate */
-	int16_t pulse_val[7]; /* this values was get directly from decompressor */
+    int16_t gain;
+    int32_t combined_pulse_pos;
+    int16_t pulse_pos[7]; /* this values was calculate */
+    int16_t pulse_val[7]; /* this values was get directly from decompressor */
 };
 
 struct dsp_sp_frame {
-	int16_t	filter_idx[14];
+    int16_t	filter_idx[14];
 
-	int16_t sf_adaptive_gain[SUBFRAMES];
-	int16_t pitch_lag[SUBFRAMES];
+    int16_t sf_adaptive_gain[SUBFRAMES];
+    int16_t pitch_lag[SUBFRAMES];
 
-	struct dss_sp_subframe sf[SUBFRAMES];
+    struct dss_sp_subframe sf[SUBFRAMES];
 };
 
 struct lpc_data {
-	int32_t filter[14];
+    int32_t filter[14];
 };
 
 typedef struct dss_sp_context {
@@ -673,7 +671,7 @@ static void dss_sp_sf_synthesis(DSS_SP_Context *p, int32_t a0,
     int i, tmp;
 
     if (size > 0) {
-    	vsum_1 = dss_sp_vector_sum(p, size);
+        vsum_1 = dss_sp_vector_sum(p, size);
 
         if (vsum_1 > 0xFFFFF)
             vsum_1 = 0xFFFFF;
@@ -785,7 +783,8 @@ static void dss_sp_32to16bit(int16_t *dst, int32_t *src, int size) {
         dst[i] = av_clip_int16(src[i]);
 }
 
-static int dss_sp_decode_one_frame(DSS_SP_Context *p, int16_t *abuf_dst, const uint8_t *abuff_src) {
+static int dss_sp_decode_one_frame(DSS_SP_Context *p,
+                int16_t *abuf_dst, const uint8_t *abuff_src) {
 
     int i, sf_idx;
 
