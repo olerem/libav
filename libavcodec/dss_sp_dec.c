@@ -586,7 +586,7 @@ static void dss_sp_shift_sq_sub(const int32_t *filter_buf,
         for (i = 14; i > 0; i--)
             tmp -= error_buf[i] * filter_buf[i];
 
-        /* asm overwrite error_buf[1] two times -
+        /* asm code overwrite error_buf[1] two times -
          * makes no sense for me. */
         for (i = 14; i > 0; i--)
             error_buf[i] = error_buf[i - 1];
@@ -657,7 +657,7 @@ static void dss_sp_sf_synthesis(DSS_SP_Context *p, int32_t lpc_filter,
 
     int32_t tmp_buf[15];
     int32_t noise[72];
-    int v22, bias, vsum_2, vsum_1, v36, normalize_bits;
+    int bias, vsum_2, vsum_1, v36, normalize_bits;
     int i, tmp;
 
     if (size > 0) {
@@ -709,11 +709,11 @@ static void dss_sp_sf_synthesis(DSS_SP_Context *p, int32_t lpc_filter,
         vsum_2 = dss_sp_vector_sum(p, size);
 
     if (vsum_2 >= 0x40)
-        v22 = (vsum_1 << 11) / vsum_2;
+        tmp = (vsum_1 << 11) / vsum_2;
     else
-        v22 = 1;
+        tmp = 1;
 
-    bias = 409 * v22 >> 15 << 15;
+    bias = 409 * tmp >> 15 << 15;
     tmp = (bias + 32358 * p->noise_state) >> 15;
     noise[0] = av_clip_int16(tmp);
 
