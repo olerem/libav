@@ -365,7 +365,7 @@ static void dss_sp_unpack_coeffs(DSS_SP_Context *p, const uint8_t *src)
                 /* this part seems to be close to g723.1 gen_fcb_excitation()
                  * RATE_6300 */
 
-                /* TODO: 7 is what? size of subframe? */
+                /* TODO: what is 7? size of subframe? */
                 for (i = 0; i < 7; i++) {
                     for (; combined_pulse_pos < dss_sp_combinatorial_table[pulse][pulse_idx];
                          --pulse_idx)
