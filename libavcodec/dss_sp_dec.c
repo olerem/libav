@@ -452,95 +452,39 @@ static void dss_sp_convert_coeffs(struct lpc_data *lpc,
                 coeff_2 = coeffs[a_plus - counter];
 
                 tmp = DSS_FORMULA(coeff_1, lpc->filter[a], coeff_2);
-                coeffs[counter] = av_clip_int16(tmp);
+                tmp &= 0xFFFF8000;
+                if (tmp && tmp != 0xFFFF8000)
+                    goto clean_up;
 
                 tmp = DSS_FORMULA(coeff_2, lpc->filter[a], coeff_1);
-                coeffs[a_plus - counter] = av_clip_int16(tmp);
+                tmp &= 0xFFFF8000;
+                if (tmp && tmp != 0xFFFF8000)
+                	goto clean_up;
             }
         }
     }
+    return;
 
+clean_up:
     coeffs[0] = 0x1000;
     for (a = 0; a < 14; a++) {
         a_plus = a + 1;
         coeffs[a_plus] = lpc->filter[0] >> 3;
         if (a_plus / 2 >= 1) {
             for (counter = 1; counter <= a_plus / 2; counter++) {
-                int coeff_1, coeff_2, tmp, b;
+                int coeff_1, coeff_2, tmp;
 
-                b = a - counter;
                 coeff_1 = coeffs[counter];
-                coeff_2 = coeffs[b + 1];
+                coeff_2 = coeffs[a_plus - counter];
 
                 tmp = DSS_FORMULA(coeff_1, lpc->filter[0], coeff_2);
                 coeffs[counter] = av_clip_int16(tmp);
 
-                tmp = DSS_FORMULA(coeff_2, coeff_1, lpc->filter[0]);
-                coeffs[b] = av_clip_int16(tmp);
+                tmp = DSS_FORMULA(coeff_2, lpc->filter[0], coeff_1);
+                coeffs[a - counter] = av_clip_int16(tmp);
             }
         }
     }
-
-#if 0 // executed only when there are overflows in the inner loop
-    struct struc_6 *struc_6_v14 = struc_6_a1;
-    int v24, v14 = 0;
-    int word_3D9B7C = 1;
-    coeffs[0] = 0x1000;
-    int v26 = 0;
-    struct struc_6 *struc_6_v29 = struc_6_a1;
-    int32_t *array14a = coeffs;
-    int v28 = 14;
-    do
-    {
-        int v15 = v14 + 1;
-        *array14a = struc_6_v14->filter[0] >> 3;
-        counter = 1;
-        int v30 = v14 + 1;
-        int v29 = (v14 + 1) / 2;
-        if ( (v14 + 1) / 2 >= 1 )
-        {
-            int v16 = 1;
-            while ( 1 )
-            {
-                int v17 = v14 - v16;
-                int v19 = coeffs[v17 + 1];
-
-                tmp = DSS_FORMULA(coeffs[v16], struc_6_v14->filter[0], v19);
-                coeffs[v16] = tmp;
-                tmp &= 0xFFFF8000;
-                if ( tmp && tmp != 0xFFFF8000 )
-                    coeffs[v16] = ((tmp <= 0) - 1) - 0x8000;
-
-                struc_6_v14 = struc_6_v29;
-
-                tmp = DSS_FORMULA(v19, coeffs[v16], struc_6_v29->filter[0]);
-                coeffs[v17] = v22;
-                v22 &= 0xFFFF8000;
-                if ( v22 && v22 != 0xFFFF8000 )
-                {
-                    if ( v22 <= 0 )
-                        coeffs[v17] = 0xFFFF8000;
-                    else
-                        coeffs[v17] = 0x7FFF;
-                }
-                ++counter;
-                v16 = counter;
-                if ( counter > v29 )
-                break;
-                v14 = v26;
-            }
-            v15 = v30;
-        }
-        v14 = v15;
-        struc_6_v14 = (struct struc_6 *)((char *)struc_6_v14 + 4);
-        v24 = v28 == 1;
-        v26 = v15;
-        array14a++;
-        struc_6_v29 = struc_6_v14;
-        --v28;
-    }
-    while ( !v24 );
-#endif
 }
 
 /* this function will get pointer to one of 4 subframes */
