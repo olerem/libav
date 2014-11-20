@@ -29,7 +29,6 @@
 
 #define SUBFRAMES		4
 #define PULSE_MAX		8
-#define DSS_CBUF_SIZE		21
 #define DSS_SP_FRAME_SIZE	42
 #define DSS_SP_SAMPLE_COUNT	(66 * SUBFRAMES)
 
@@ -525,12 +524,12 @@ static void dss_sp_convert_coeffs(struct lpc_data *lpc,
 }
 
 /* this function will get pointer to one of 4 subframes */
-static void dss_sp_add_pulses(int32_t *array72_a1, const struct dss_sp_subframe *sf) {
+static void dss_sp_add_pulses(int32_t *vector_buf, const struct dss_sp_subframe *sf) {
     int i;
 
     //looks like "output[sf->pulse_pos[i]] += g_gains[sf->gain] * g_pulse_val[sf->pulse_val[i]] + 0x4000 >> 15;"
     for (i = 0; i < 7; i++)
-        array72_a1[sf->pulse_pos[i]] += (dss_sp_fixed_cb_gain[sf->gain]
+        vector_buf[sf->pulse_pos[i]] += (dss_sp_fixed_cb_gain[sf->gain]
                 * dss_sp_pulse_val[sf->pulse_val[i]] + 0x4000) >> 15;
 
 }
@@ -575,45 +574,45 @@ static void dss_sp_update_buf(int32_t *hist, int32_t *vector) {
         vector[72 - i] = hist[i];
 }
 
-static void dss_sp_shift_sq_sub(const int32_t *array_a1,
-        int32_t *array_a2, int32_t *dst) {
+static void dss_sp_shift_sq_sub(const int32_t *filter_buf,
+        int32_t *error_buf, int32_t *dst) {
     int a;
 
     for (a = 0; a < 72; a++) {
         int i, tmp;
 
-        tmp = dst[a] * array_a1[0];
+        tmp = dst[a] * filter_buf[0];
 
         for (i = 14; i > 0; i--)
-            tmp -= array_a2[i] * array_a1[i];
+            tmp -= error_buf[i] * filter_buf[i];
 
-        /* asm overwrite array_a2[1] two times -
+        /* asm overwrite error_buf[1] two times -
          * makes no sense for me. */
         for (i = 14; i > 0; i--)
-            array_a2[i] = array_a2[i - 1];
+            error_buf[i] = error_buf[i - 1];
 
         tmp = (tmp + 4096) >> 13;
 
-        array_a2[1] = tmp;
+        error_buf[1] = tmp;
 
         dst[a] = av_clip_int16(tmp);
     }
 }
 
-static void dss_sp_shift_sq_add(const int32_t *array_a1, int32_t *array_a2,
+static void dss_sp_shift_sq_add(const int32_t *filter_buf, int32_t *audio_buf,
         int32_t *dst) {
     int a;
 
     for (a = 0; a < 72; a++) {
         int i, tmp = 0;
 
-        array_a2[0] = dst[a];
+        audio_buf[0] = dst[a];
 
         for (i = 14; i >= 0; i--)
-            tmp += array_a2[i] * array_a1[i];
+            tmp += audio_buf[i] * filter_buf[i];
 
         for (i = 14; i > 0; i--)
-            array_a2[i] = array_a2[i - 1];
+            audio_buf[i] = audio_buf[i - 1];
 
         tmp = (tmp + 4096) >> 13;
 
@@ -621,24 +620,24 @@ static void dss_sp_shift_sq_add(const int32_t *array_a1, int32_t *array_a2,
     }
 }
 
-static void dss_sp_vec_mult(const int32_t *array15_ro_src, int32_t *dst,
-        const int32_t *array15_ro_a3) {
+static void dss_sp_vec_mult(const int32_t *src, int32_t *dst,
+        const int32_t *mult) {
     int i;
 
-    dst[0] = array15_ro_src[0];
+    dst[0] = src[0];
 
     for (i = 1; i < 15; i++)
-        dst[i] = (array15_ro_src[i] * array15_ro_a3[i] + 0x4000) >> 15;
+        dst[i] = (src[i] * mult[i] + 0x4000) >> 15;
 }
 
-static int dss_sp_get_normalize_bits(int32_t *array_var, int16_t size) {
+static int dss_sp_get_normalize_bits(int32_t *vector_buf, int16_t size) {
     unsigned int val;
     int max_val;
     int i;
 
     val = 1;
     for (i = 0; i < size; i++)
-        val |= FFABS(array_var[i]);
+        val |= FFABS(vector_buf[i]);
 
     for (max_val = 0; val <= 0x4000; ++max_val)
         val *= 2;
@@ -653,12 +652,12 @@ static int dss_sp_vector_sum(DSS_SP_Context *p, int size)
     return sum;
 }
 
-static void dss_sp_sf_synthesis(DSS_SP_Context *p, int32_t a0,
+static void dss_sp_sf_synthesis(DSS_SP_Context *p, int32_t lpc_filter,
         int32_t *dst, int size) {
 
     int32_t tmp_buf[15];
     int32_t noise[72];
-    int v11, v22, bias, vsum_2, vsum_1, v36, normalize_bits;
+    int v22, bias, vsum_2, vsum_1, v36, normalize_bits;
     int i, tmp;
 
     if (size > 0) {
@@ -686,19 +685,19 @@ static void dss_sp_sf_synthesis(DSS_SP_Context *p, int32_t a0,
     dss_sp_shift_sq_sub(tmp_buf,
             p->err_buf1, p->vector_buf);
 
-    /* a0 can be negative */
-    v11 = a0 >> 1;
-    if (v11 >= 0)
-        v11 = 0;
+    /* lpc_filter can be negative */
+    lpc_filter = lpc_filter >> 1;
+    if (lpc_filter >= 0)
+        lpc_filter = 0;
 
     if (size > 1) {
         for (i = size - 1; i > 0; i--) {
-            tmp = DSS_FORMULA(p->vector_buf[i], v11, p->vector_buf[i - 1]);
+            tmp = DSS_FORMULA(p->vector_buf[i], lpc_filter, p->vector_buf[i - 1]);
             p->vector_buf[i] = av_clip_int16(tmp);
         }
     }
 
-    tmp = DSS_FORMULA(p->vector_buf[0], v11, v36);
+    tmp = DSS_FORMULA(p->vector_buf[0], lpc_filter, v36);
     p->vector_buf[0] = av_clip_int16(tmp);
 
     dss_sp_scale_vector(p->vector_buf, -normalize_bits, size);
