@@ -479,7 +479,7 @@ static void dss_sp_convert_coeffs(struct lpc_data *lpc,
                     coeffs[counter] = ((tmp <= 0) - 1) - 0x8000;
 
 
-                tmp = DSS_FORMULA(coeff_2, lpc->filter[0], coeff_1);
+                tmp = DSS_FORMULA(coeff_2, coeff_1, lpc->filter[0]);
                 coeffs[a_plus - counter] = av_clip_int16(tmp);
             }
         }
