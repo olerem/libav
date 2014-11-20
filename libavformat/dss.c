@@ -1,6 +1,6 @@
 /*
  * dss demuxer
- * Copyright (c) 2014 Oleksij Rempel
+ * Copyright (c) 2014 Oleksij Rempel <linux@rempel-privat.de>
  *
  * This file is part of Libav.
  *
@@ -17,11 +17,6 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with Libav; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
- */
-
-/**
- * @file
- *
  */
 
 #include "libavutil/bswap.h"
@@ -219,17 +214,17 @@ static int dss_sp_read_packet(AVFormatContext *s, AVPacket *pkt)
 
 
     if (priv->swap) {
-    	read_size = DSS_SP_FRAME_SIZE - 2;
-    	buff_offset = 3;
+        read_size = DSS_SP_FRAME_SIZE - 2;
+        buff_offset = 3;
     } else
-    	read_size = DSS_SP_FRAME_SIZE;
+        read_size = DSS_SP_FRAME_SIZE;
 
 
     priv->counter -= read_size;
 
     buff = av_malloc(DSS_SP_FRAME_SIZE + 1);
     if (!buff)
-    	return AVERROR_EOF;
+        return AVERROR_EOF;
 
     ret = av_new_packet(pkt, DSS_SP_FRAME_SIZE);
     if (ret < 0)
@@ -244,16 +239,16 @@ static int dss_sp_read_packet(AVFormatContext *s, AVPacket *pkt)
         ret = avio_read(s->pb, buff + offset + buff_offset,
             size2 - offset);
         if (ret < size2 - offset)
-        	goto error_eof;
+            goto error_eof;
 
         dss_skip_audio_header(s, pkt);
         offset = size2;
     }
 
     ret = avio_read(s->pb, buff + offset + buff_offset,
-    		read_size - offset);
+                    read_size - offset);
     if (ret < read_size - offset)
-    	goto error_eof;
+        goto error_eof;
 
     dss_sp_byte_swap(priv, pkt->data, buff);
     av_free(buff);
@@ -321,9 +316,9 @@ static int dss_read_packet(AVFormatContext *s, AVPacket *pkt)
     DSSDemuxContext *priv = s->priv_data;
 
     if (priv->audio_codec == DSS_ACODEC_DSS_SP)
-    	return dss_sp_read_packet(s, pkt);
+        return dss_sp_read_packet(s, pkt);
     else
-    	return dss_723_1_read_packet(s, pkt);
+        return dss_723_1_read_packet(s, pkt);
 }
 
 AVInputFormat ff_dss_demuxer = {
