@@ -452,36 +452,11 @@ static void dss_sp_convert_coeffs(struct lpc_data *lpc,
                 coeff_2 = coeffs[a_plus - counter];
 
                 tmp = DSS_FORMULA(coeff_1, lpc->filter[a], coeff_2);
-                tmp &= 0xFFFF8000;
-                if (tmp && tmp != 0xFFFF8000)
-                    goto clean_up;
-
-                tmp = DSS_FORMULA(coeff_2, lpc->filter[a], coeff_1);
-                tmp &= 0xFFFF8000;
-                if (tmp && tmp != 0xFFFF8000)
-                	goto clean_up;
-            }
-        }
-    }
-    return;
-
-clean_up:
-    coeffs[0] = 0x1000;
-    for (a = 0; a < 14; a++) {
-        a_plus = a + 1;
-        coeffs[a_plus] = lpc->filter[0] >> 3;
-        if (a_plus / 2 >= 1) {
-            for (counter = 1; counter <= a_plus / 2; counter++) {
-                int coeff_1, coeff_2, tmp;
-
-                coeff_1 = coeffs[counter];
-                coeff_2 = coeffs[a_plus - counter];
-
-                tmp = DSS_FORMULA(coeff_1, lpc->filter[0], coeff_2);
                 coeffs[counter] = av_clip_int16(tmp);
 
-                tmp = DSS_FORMULA(coeff_2, lpc->filter[0], coeff_1);
-                coeffs[a - counter] = av_clip_int16(tmp);
+                tmp = DSS_FORMULA(coeff_2, lpc->filter[a], coeff_1);
+                coeffs[a_plus - counter] = av_clip_int16(tmp);
+
             }
         }
     }
